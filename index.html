@@ -1104,8 +1104,8 @@ ${txt}
   }
 
   // botão de prescrição (mantido)
-  if(c.statusFluxo === 'aguardando_prescricao'){
-  h += '<button class="btn btn-warning" style="margin-top:12px" onclick="closeModal();goPrescrPage('+c.id+')">Prescrição</button>';
+ if(c.statusFluxo === 'aguardando_prescricao'){
+  h += '<button class="btn btn-warning" style="margin-top:12px" onclick="(function(id){setTimeout(function(){closeModal();goPrescrPage(id)},10)})(\''+c.id+'\')">Prescrição</button>';
 }
 
   h += '<div class="modal-actions">';
