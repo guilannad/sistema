@@ -1205,7 +1205,8 @@ window.goPerfil=function(id){S.viewPessoaId=id;S.activeTab='perfil_cliente';rend
 window.goCiclo=function(id){S.viewCicloId=id;S.activeTab='detalhe_ciclo';render()};
 window.goPrescrPage=function(id){
   S.viewConsId = id;
-  S.modal = null; // 🔥 ESSENCIAL
+  S.editConsulente = getCons(id); // 🔥 ESSENCIAL
+  S.modal = null;
   S.activeTab = 'prescricao_page';
   render();
 };
