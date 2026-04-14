@@ -1203,7 +1203,12 @@ async function fin(foto){if(isE){var p=getPessoa(S.editItem);if(p){p.nome=n;p.te
 if(fotoI&&fotoI.files&&fotoI.files[0]){compressImage(fotoI.files[0],400,50,function(r){fin(r)})}else fin('')};
 window.goPerfil=function(id){S.viewPessoaId=id;S.activeTab='perfil_cliente';render()};
 window.goCiclo=function(id){S.viewCicloId=id;S.activeTab='detalhe_ciclo';render()};
-window.goPrescrPage=function(id){S.viewConsId=id;S.activeTab='prescricao_page';render()};
+window.goPrescrPage=function(id){
+  S.viewConsId = id;
+  S.modal = null; // 🔥 ESSENCIAL
+  S.activeTab = 'prescricao_page';
+  render();
+};
 window.openAddCiclo=function(pid){S.flowPessoaId=pid;S.modal='addCiclo';render()};
 window.saveNewCiclo=function(){S.ciclos.push({id:nid(S.ciclos),pessoaId:S.flowPessoaId,tipo:'compra',dataInicio:today(),dataFim:'',status:'ativo',observacoes:document.getElementById('ciObs')?document.getElementById('ciObs').value.trim():''});addHistDB('Ciclo');toast('OK!');closeModal()};
 window.setCicloSt=function(id,st){var c=getCiclo(id);if(c){c.status=st;if(st!=='ativo')c.dataFim=today();save();render()}};
