@@ -927,7 +927,8 @@ if(alerts.length){h+='<div class="chart-container" style="border-left:4px solid 
 if(S.notifications.length){h+='<div class="chart-container"><div class="chart-title">Notificações Recentes</div>';S.notifications.slice(0,5).forEach(function(n){h+='<div style="padding:4px 10px;margin-bottom:3px;font-size:12px;color:var(--text2)">'+esc(n.tipo)+': '+esc(n.nome)+' \u2022 '+esc(n.time)+'</div>'});h+='</div>'}
 }
 // Kanban
-var k='<div class="kanban-grid">';STATUS_FLUXO.forEach(function(s){k+='<div class="kanban-col"><div class="kanban-header">'+esc(s.label)+'<span class="kanban-count">'+bs[s.key].length+'</span></div>';bs[s.key].forEach(function(c){var pd=0;if(c.statusFluxo==='aguardando_prescricao'&&c.dataConsulta)pd=daysDiff(c.dataConsulta,today());k+='<div class="kanban-card" style="border-left-color:'+s.color+'"><h4>'+esc(c.nomeCompleto)+'</h4><div class="kc-sub">'+fmtDate(c.dataConsulta)+' <span class="pag-badge pag-'+c.statusPagamento+'">'+pagLabel(c.statusPagamento)+'</span></div>';if(pd>=3)k+='<div style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--danger-bg);color:var(--danger);margin-bottom:4px">'+pd+'d sem prescrição</div>';k+='<div class="kc-actions">';var idx=STATUS_FLUXO.findIndex(function(x){return x.key===s.key});if(idx>0&&s.key!=='cancelado')k+='<button class="btn btn-sm btn-outline" onclick="revertCons('+c.id+')">\u25C0</button>';if(idx<4&&s.key!=='concluido'&&s.key!=='cancelado')k+='<button class="btn btn-sm btn-success" onclick="advanceCons('+c.id+')">Avançar</button>';if(s.key==='aguardando_prescricao')k+='<button class="btn btn-sm btn-warning" onclick="if(!c.id){alert('ID não encontrado');console.log(c);return;}goPrescrPage('+c.id+')">Prescrição</button>';if(s.key==='aguardando_ebo')k+='<button class="btn btn-sm btn-info" onclick="gerarEbo(getCons('+c.id+'))">Ebó</button>';k+='<button class="btn btn-sm btn-outline" onclick="openViewCons('+c.id+')">Ver</button></div></div>'});k+='</div>'});k+='</div>';
+var k='<div class="kanban-grid">';STATUS_FLUXO.forEach(function(s){k+='<div class="kanban-col"><div class="kanban-header">'+esc(s.label)+'<span class="kanban-count">'+bs[s.key].length+'</span></div>';bs[s.key].forEach(function(c){var pd=0;if(c.statusFluxo==='aguardando_prescricao'&&c.dataConsulta)pd=daysDiff(c.dataConsulta,today());k+='<div class="kanban-card" style="border-left-color:'+s.color+'"><h4>'+esc(c.nomeCompleto)+'</h4><div class="kc-sub">'+fmtDate(c.dataConsulta)+' <span class="pag-badge pag-'+c.statusPagamento+'">'+pagLabel(c.statusPagamento)+'</span></div>';if(pd>=3)k+='<div style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--danger-bg);color:var(--danger);margin-bottom:4px">'+pd+'d sem prescrição</div>';k+='<div class="kc-actions">';var idx=STATUS_FLUXO.findIndex(function(x){return x.key===s.key});if(idx>0&&s.key!=='cancelado')k+='<button class="btn btn-sm btn-outline" onclick="revertCons('+c.id+')">\u25C0</button>';if(idx<4&&s.key!=='concluido'&&s.key!=='cancelado')k+='<button class="btn btn-sm btn-success" onclick="advanceCons('+c.id+')">Avançar</button>';if(s.key==='aguardando_prescricao')
+  k+='<button class="btn btn-sm btn-warning" onclick="goPrescrPage('+c.id+')">Prescrição</button>'; if(s.key==='aguardando_ebo')k+='<button class="btn btn-sm btn-info" onclick="gerarEbo(getCons('+c.id+'))">Ebó</button>';k+='<button class="btn btn-sm btn-outline" onclick="openViewCons('+c.id+')">Ver</button></div></div>'});k+='</div>'});k+='</div>';
 return h+k}
 
 // === DASHBOARD VENDAS ===
@@ -1203,11 +1204,26 @@ async function fin(foto){if(isE){var p=getPessoa(S.editItem);if(p){p.nome=n;p.te
 if(fotoI&&fotoI.files&&fotoI.files[0]){compressImage(fotoI.files[0],400,50,function(r){fin(r)})}else fin('')};
 window.goPerfil=function(id){S.viewPessoaId=id;S.activeTab='perfil_cliente';render()};
 window.goCiclo=function(id){S.viewCicloId=id;S.activeTab='detalhe_ciclo';render()};
-window.goPrescrPage=function(id){
+window.goPrescrPage = function(id){
+  console.log('ID RECEBIDO:', id);
+
+  if(!id){
+    alert('Erro: ID não encontrado');
+    return;
+  }
+
+  var c = getCons(id);
+
+  if(!c){
+    alert('Consulente não encontrado');
+    return;
+  }
+
   S.viewConsId = id;
-  S.editConsulente = getCons(id); // 🔥 ESSENCIAL
+  S.editConsulente = c;
   S.modal = null;
   S.activeTab = 'prescricao_page';
+
   render();
 };
 window.openAddCiclo=function(pid){S.flowPessoaId=pid;S.modal='addCiclo';render()};
@@ -1444,7 +1460,8 @@ if(delAlerts.length){h+='<div class="chart-container" style="border-left:4px sol
 if(alerts.length){h+='<div class="chart-container" style="border-left:4px solid var(--danger)"><div class="chart-title" style="color:var(--danger)">Prescrições Pendentes</div>';alerts.forEach(function(a){h+='<div style="padding:6px 10px;margin-bottom:4px;border-radius:6px;background:'+(a.level==='danger'?'var(--danger-bg)':'var(--warning-bg)')+';display:flex;align-items:center;justify-content:space-between">'+esc(a.consulente.nomeCompleto)+' - '+a.dias+'d <button class="btn btn-sm btn-warning" onclick="goPrescrPage('+a.consulente.id+')">Prescrever</button></div>'});h+='</div>'}
 if(S.notifications.length){h+='<div class="chart-container"><div class="chart-title">Notificações Recentes</div>';S.notifications.slice(0,5).forEach(function(n){h+='<div style="padding:4px 10px;margin-bottom:3px;font-size:12px;color:var(--text2)">'+esc(n.tipo)+': '+esc(n.nome)+' • '+esc(n.time)+'</div>'});h+='</div>'}
 }
-var k='<div class="kanban-grid">';STATUS_FLUXO.forEach(function(s){k+='<div class="kanban-col"><div class="kanban-header">'+esc(s.label)+'<span class="kanban-count">'+bs[s.key].length+'</span></div>';bs[s.key].forEach(function(c){var pd=0;if(c.statusFluxo==='aguardando_prescricao'&&c.dataConsulta)pd=daysDiff(c.dataConsulta,today());k+='<div class="kanban-card" style="border-left-color:'+s.color+'"><h4>'+esc(c.nomeCompleto)+'</h4><div class="kc-sub">'+fmtDate(c.dataConsulta)+' <span class="pag-badge pag-'+c.statusPagamento+'">'+pagLabel(c.statusPagamento)+'</span></div>';if(pd>=3)k+='<div style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--danger-bg);color:var(--danger);margin-bottom:4px">'+pd+'d sem prescrição</div>';k+='<div class="kc-actions">';var idx=STATUS_FLUXO.findIndex(function(x){return x.key===s.key});if(idx>0&&s.key!=='cancelado')k+='<button class="btn btn-sm btn-outline" onclick="revertCons('+c.id+')">◀</button>';if(idx<4&&s.key!=='concluido'&&s.key!=='cancelado')k+='<button class="btn btn-sm btn-success" onclick="advanceCons('+c.id+')">Avançar</button>';if(s.key==='aguardando_consulta')k+='<button class="btn btn-sm btn-info" onclick="openConsMsg('+c.id+')">Confirmação</button>';if(s.key==='aguardando_prescricao')k+='<button class="btn btn-sm btn-warning" onclick="if(!c.id){alert('ID não encontrado');console.log(c);return;}goPrescrPage('+c.id+')">Prescrição</button>';if(s.key==='aguardando_ebo')k+='<button class="btn btn-sm btn-info" onclick="gerarEbo(getCons('+c.id+'))">Ebó</button>';k+='<button class="btn btn-sm btn-outline" onclick="openViewCons('+c.id+')">Ver</button></div></div>'});k+='</div>'});k+='</div>';
+var k='<div class="kanban-grid">';STATUS_FLUXO.forEach(function(s){k+='<div class="kanban-col"><div class="kanban-header">'+esc(s.label)+'<span class="kanban-count">'+bs[s.key].length+'</span></div>';bs[s.key].forEach(function(c){var pd=0;if(c.statusFluxo==='aguardando_prescricao'&&c.dataConsulta)pd=daysDiff(c.dataConsulta,today());k+='<div class="kanban-card" style="border-left-color:'+s.color+'"><h4>'+esc(c.nomeCompleto)+'</h4><div class="kc-sub">'+fmtDate(c.dataConsulta)+' <span class="pag-badge pag-'+c.statusPagamento+'">'+pagLabel(c.statusPagamento)+'</span></div>';if(pd>=3)k+='<div style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--danger-bg);color:var(--danger);margin-bottom:4px">'+pd+'d sem prescrição</div>';k+='<div class="kc-actions">';var idx=STATUS_FLUXO.findIndex(function(x){return x.key===s.key});if(idx>0&&s.key!=='cancelado')k+='<button class="btn btn-sm btn-outline" onclick="revertCons('+c.id+')">◀</button>';if(idx<4&&s.key!=='concluido'&&s.key!=='cancelado')k+='<button class="btn btn-sm btn-success" onclick="advanceCons('+c.id+')">Avançar</button>';if(s.key==='aguardando_consulta')k+='<button class="btn btn-sm btn-info" onclick="openConsMsg('+c.id+')">Confirmação</button>';if(s.key==='aguardando_prescricao')
+  k+='<button class="btn btn-sm btn-warning" onclick="goPrescrPage('+JSON.stringify(c.id)+')">Prescrição</button>';if(s.key==='aguardando_ebo')k+='<button class="btn btn-sm btn-info" onclick="gerarEbo(getCons('+c.id+'))">Ebó</button>';k+='<button class="btn btn-sm btn-outline" onclick="openViewCons('+c.id+')">Ver</button></div></div>'});k+='</div>'});k+='</div>';
 return h+k};
 
 
@@ -1484,6 +1501,15 @@ function sendZap(){
   var url = 'https://wa.me/?text=' + encodeURIComponent(t.value);
   window.open(url, '_blank');
 }
+
+document.querySelectorAll('.btn-prescr').forEach(function(btn){
+  btn.onclick = function(){
+    var id = this.getAttribute('data-id');
+    console.log('CLICK OK ID:', id);
+    goPrescrPage(Number(id));
+  };
+});
+
 </script>
 </body>
 </html>
