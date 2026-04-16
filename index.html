@@ -716,7 +716,7 @@ var blocks=[];
 blocks.push('<div class="info"><div>DAFÁ REALIZADA EM '+fmtDate(c.dataConsulta)+'<br>'+esc(c.nomeCompleto).toUpperCase()+' '+fmtDate(c.dataNascimento)+'<br>FILHO(A) DE '+esc(c.nomeMae||'').toUpperCase()+'</div><div style="text-align:right">'+esc(c.oduResultado||'').toUpperCase()+'<br>'+esc(c.oduDescricao||'')+'</div></div>');
 blocks.push('<div class="stit">Considerações Gerais</div>');
 (c.consideracoesGerais||'').split('\n').forEach(function(p){if(p.trim())blocks.push('<div class="tb">'+esc(p)+'</div>')});
-if(c.prescricaoRituais){blocks.push('<div class="stit">Prescrições de Rituais</div>');
+if(c.prescricaoRituais){blocks.push('<div class="stit">Ritualidades</div>');
 (c.prescricaoRituais||'').split('\n\n').forEach(function(r){if(r.trim())blocks.push('<div class="tb">'+esc(r).replace(/\n/g,'<br>')+'</div>')})}
 if(c.prescricaoMedicinas){blocks.push('<div class="stit">Prescrições de Medicinas</div>');
 (c.prescricaoMedicinas||'').split('\n\n').forEach(function(m){if(m.trim())blocks.push('<div class="tb">'+esc(m).replace(/\n/g,'<br>')+'</div>')})}
