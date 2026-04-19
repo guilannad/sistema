@@ -102,7 +102,7 @@ tr:hover td{background:var(--accent-bg)}
 .toast-success{background:var(--success)}.toast-error{background:var(--danger)}.toast-info{background:var(--info)}.toast-warning{background:var(--warning)}
 @keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
 .status-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;white-space:nowrap}
-.st-aguardando_consulta{background:#EBF5FB;color:#2471A3}.st-aguardando_prescricao{background:#F5ECD4;color:#8B6914}.st-aguardando_ebo{background:#F3E5F5;color:#6A1B9A}.st-aguardando_medicina{background:#E0F2F1;color:#00695C}.st-concluido{background:#E8F8F0;color:#1E8449}.st-cancelado{background:#FDEDEC;color:#C0392B}.st-ativo{background:#EBF5FB;color:#2471A3}
+.st-aguardando_consulta{background:#EBF5FB;color:#2471A3}.st-aguardando_prescricao{background:#F5ECD4;color:#8B6914}.st-aguardando_decisao{background:#EADCF1;color:#7D3C98}.st-aguardando_ebo{background:#F3E5F5;color:#6A1B9A}.st-ebo_em_andamento{background:#FDE8D0;color:#CA6F1E}.st-aguardando_medicina{background:#E0F2F1;color:#00695C}.st-concluido{background:#E8F8F0;color:#1E8449}.st-arquivado{background:#EAECEE;color:#707B7C}.st-cancelado{background:#FDEDEC;color:#C0392B}.st-ativo{background:#EBF5FB;color:#2471A3}
 .pag-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
 .pag-pendente{background:#FDEDEC;color:#C0392B}.pag-50_pago{background:#FEF9E7;color:#B7950B}.pag-pago{background:#E8F8F0;color:#1E8449}
 .kanban-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;margin-bottom:12px}
@@ -177,10 +177,75 @@ var SECOES=["Escritório do Bàbá","Quarto dos Mestres","Armário da Cozinha","
 var TIPOS=["Caixa","Casca","Defumação","Erva","Fava","Folha","Fruto/Semente","Insumo","Item","Item/Magia","Líquido","Pedras","Pó","Raiz","Sabão","Semente","Voodoo"];
 var PERFIS=['admin','editor','viewer','secretario','babalawo','assistente'];
 var BAR_COLORS=["#CA6F1E","#5D4037","#6A1B9A","#2E7D32","#E65100","#388E3C","#F57F17","#00695C","#7D3C98","#AD1457","#2471A3","#5D6D7E","#8B6914","#4E342E","#1E8449","#558B2F","#212121"];
-var STATUS_FLUXO=[{key:'aguardando_consulta',label:'Aguardando Consulta',color:'#2471A3'},{key:'aguardando_prescricao',label:'Aguardando Prescrição',color:'#8B6914'},{key:'aguardando_ebo',label:'Aguardando Ebó',color:'#6A1B9A'},{key:'ebo_em_andamento',label:'Ebó em Andamento',color:'#CA6F1E'},{key:'aguardando_medicina',label:'Aguardando Medicina',color:'#00695C'},{key:'concluido',label:'Concluído',color:'#1E8449'},{key:'cancelado',label:'Cancelado',color:'#C0392B'}];
+var STATUS_FLUXO=[{key:'aguardando_consulta',label:'Aguardando Consulta',color:'#2471A3'},{key:'aguardando_prescricao',label:'Aguardando Prescrição',color:'#8B6914'},{key:'aguardando_decisao',label:'Aguardando Decisão',color:'#7D3C98'},{key:'aguardando_ebo',label:'Aguardando Ebó',color:'#6A1B9A'},{key:'ebo_em_andamento',label:'Ebó em Andamento',color:'#CA6F1E'},{key:'aguardando_medicina',label:'Aguardando Medicina',color:'#00695C'},{key:'concluido',label:'Concluído',color:'#1E8449'},{key:'arquivado',label:'Arquivado',color:'#707B7C'},{key:'cancelado',label:'Cancelado',color:'#C0392B'}];
 var VALOR_CONSULTA={normal:500,urgencia:750};
 function consValorCobrado(c){var v=parseFloat(c.valorCobrado)||0;if(v>0)return v;return VALOR_CONSULTA[c.tipoConsulta||'normal']||0}
 function consValorRecebido(c){var v=parseFloat(c.valorRecebido)||0;if(v>0)return v;return VALOR_CONSULTA[c.tipoConsulta||'normal']||0}
+
+// ============= ITENS (EBÓS / MEDICINAS) HELPERS =============
+// Normalize an item - ensures all fields exist with defaults
+function normalizeItem(it,kind){
+if(!it)it={};
+return {
+id:it.id||('it_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)),
+kind:kind||it.kind||'ebo',
+titulo:it.titulo||'',
+descricao:it.descricao||'',
+valor:parseFloat(it.valor)||0,
+aceito:(typeof it.aceito==='boolean')?it.aceito:null,
+status:it.status||'pendente',
+valorPago:parseFloat(it.valorPago)||0,
+vendaId:it.vendaId||null,
+dataDecisao:it.dataDecisao||'',
+dataConclusao:it.dataConclusao||'',
+observacoes:it.observacoes||''}}
+
+function normalizeItems(arr,kind){return (arr||[]).map(function(x){return normalizeItem(x,kind)})}
+
+// Given a consulente, calculate derived stats
+function consStats(c){
+var ebos=normalizeItems(c.prescricaoEbos,'ebo');
+var meds=normalizeItems(c.prescricaoMedicinasItens,'medicina');
+var all=ebos.concat(meds);
+var aceitos=all.filter(function(x){return x.aceito===true});
+var recusados=all.filter(function(x){return x.aceito===false});
+var pendentesDecisao=all.filter(function(x){return x.aceito===null});
+var aceitosEbos=aceitos.filter(function(x){return x.kind==='ebo'});
+var aceitosMeds=aceitos.filter(function(x){return x.kind==='medicina'});
+var totalAceito=0;aceitos.forEach(function(x){totalAceito+=x.valor});
+var totalPago=0;aceitos.forEach(function(x){totalPago+=x.valorPago});
+var totalPotencialNaoRealizado=0;recusados.forEach(function(x){totalPotencialNaoRealizado+=x.valor});
+var ebosPendExec=aceitosEbos.filter(function(x){return x.status==='pendente'||x.status==='em_andamento'});
+var ebosConcluidos=aceitosEbos.filter(function(x){return x.status==='concluido'});
+var medsPendExec=aceitosMeds.filter(function(x){return x.status==='pendente'||x.status==='em_andamento'});
+var medsConcluidas=aceitosMeds.filter(function(x){return x.status==='concluido'});
+return {ebos:ebos,meds:meds,all:all,aceitos:aceitos,recusados:recusados,pendentesDecisao:pendentesDecisao,aceitosEbos:aceitosEbos,aceitosMeds:aceitosMeds,totalAceito:totalAceito,totalPago:totalPago,totalPotencialNaoRealizado:totalPotencialNaoRealizado,ebosPendExec:ebosPendExec,ebosConcluidos:ebosConcluidos,medsPendExec:medsPendExec,medsConcluidas:medsConcluidas,temItens:all.length>0}}
+
+// Derive status_fluxo from item states. Respects explicit override states (cancelado, arquivado)
+function deriveStatusFluxo(c){
+if(c.statusFluxo==='cancelado')return 'cancelado';
+if(c.statusFluxo==='arquivado')return 'arquivado';
+if(c.statusFluxo==='aguardando_consulta')return 'aguardando_consulta';
+var st=consStats(c);
+// No prescription yet
+if(!st.temItens){
+if(c.statusFluxo==='aguardando_prescricao'||c.statusFluxo==='aguardando_decisao'||!c.statusFluxo)return c.statusFluxo||'aguardando_prescricao';
+return c.statusFluxo}
+// Has items but nothing decided yet
+if(st.pendentesDecisao.length===st.all.length)return 'aguardando_decisao';
+// Everything decided, nothing accepted -> archive
+if(st.aceitos.length===0)return 'arquivado';
+// Has accepted items - check what's pending
+if(st.ebosPendExec.length>0){
+// Ebos aceitos ainda não feitos -> paga first
+if(st.totalPago<st.totalAceito)return 'aguardando_ebo';
+return 'ebo_em_andamento'}
+if(st.medsPendExec.length>0)return 'aguardando_medicina';
+// All accepted items done
+if(st.recusados.length>0||st.pendentesDecisao.length>0)return 'arquivado';
+return 'concluido'}
+
+function itemStatusLabel(s){return ({pendente:'Pendente',em_andamento:'Em andamento',concluido:'Concluído',arquivado:'Arquivado'})[s]||s}
 var STATUS_VENDA=[{key:'pedido_feito',label:'Pedido Feito',color:'#2471A3'},{key:'embalando',label:'Embalando',color:'#B7950B'},{key:'enviado',label:'Enviado',color:'#8E44AD'},{key:'concluido',label:'Concluído',color:'#1E8449'},{key:'cancelado',label:'Cancelado',color:'#C0392B'}];
 var STATUS_PAG=['pendente','50_pago','pago'];
 var ORIGENS=['instagram','tiktok','youtube','facebook','google','indicacao','loja_online','direto','whatsapp'];
@@ -210,7 +275,8 @@ flowType:null,flowPessoaId:null,changeCount:0,
 reportPeriod:'mensal',reportStart:'',reportEnd:'',
 vendaItems:[{nome:'',qtd:1,valorUnit:0}],
 ritualData:{titulo:'',descricao:'',valor:0,ebos:[{titulo:'',descricao:'',valor:0}]},
-prescEbos:[{titulo:'',descricao:'',valor:0}]
+prescEbos:[{titulo:'',descricao:'',valor:0}],
+prescMeds:[{titulo:'',descricao:'',valor:0}]
 };
 
 // ==================== COUNTRY CODES (for phone international) ====================
@@ -357,8 +423,8 @@ return null}
 // Map JS camelCase to DB snake_case
 function pessoaToDB(p){return {id:p.id||undefined,nome:p.nome,nome_mae:p.nomeMae||'',telefone:p.telefone||'',email:p.email||'',data_nascimento:p.dataNascimento||null,origem:p.origem||'',observacoes:p.observacoes||'',foto:p.foto||'',logradouro:p.logradouro||'',numero:p.numero||'',complemento:p.complemento||'',bairro:p.bairro||'',cidade:p.cidade||'',estado:p.estado||'',cep:p.cep||'',pais:p.pais||'Brasil'}}
 function pessoaFromDB(r){return {id:r.id,nome:r.nome,nomeMae:r.nome_mae||'',telefone:r.telefone||'',email:r.email||'',dataNascimento:r.data_nascimento||'',origem:r.origem||'',observacoes:r.observacoes||'',foto:r.foto||'',logradouro:r.logradouro||'',numero:r.numero||'',complemento:r.complemento||'',bairro:r.bairro||'',cidade:r.cidade||'',estado:r.estado||'',cep:r.cep||'',pais:r.pais||'Brasil',dataCriacao:r.created_at?r.created_at.slice(0,10):today()}}
-function consToDB(c){return {id:c.id||undefined,pessoa_id:c.pessoaId||null,nome_completo:c.nomeCompleto,nome_mae:c.nomeMae||'',data_nascimento:c.dataNascimento||null,telefone_whatsapp:c.telefoneWhatsApp||'',data_consulta:c.dataConsulta||null,horario_consulta:c.horarioConsulta||'',formato_consulta:c.formatoConsulta||'',origem:c.origem||'',tipo_consulta:c.tipoConsulta||'normal',forma_pagamento:c.formaPagamento||'',valor_cobrado:c.valorCobrado||0,valor_recebido:c.valorRecebido||0,status_pagamento:c.statusPagamento||'pendente',status_fluxo:c.statusFluxo||'aguardando_consulta',logradouro:c.logradouro||'',numero:c.numero||'',complemento:c.complemento||'',bairro:c.bairro||'',cidade:c.cidade||'',estado:c.estado||'',cep:c.cep||'',pais:c.pais||'Brasil',odu_resultado:c.oduResultado||'',odu_descricao:c.oduDescricao||'',consideracoes_gerais:c.consideracoesGerais||'',prescricao_rituais:c.prescricaoRituais||'',prescricao_medicinas:c.prescricaoMedicinas||'',observacoes_prescricao:c.observacoesPrescricao||'',prescricao_ebos:c.prescricaoEbos||[],comprovante:c.comprovante||''}}
-function consFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,nomeCompleto:r.nome_completo,nomeMae:r.nome_mae||'',dataNascimento:r.data_nascimento||'',telefoneWhatsApp:r.telefone_whatsapp||'',dataConsulta:r.data_consulta||'',horarioConsulta:r.horario_consulta||'',formatoConsulta:r.formato_consulta||'',origem:r.origem||'',tipoConsulta:r.tipo_consulta||'normal',formaPagamento:r.forma_pagamento||'',valorCobrado:r.valor_cobrado||0,valorRecebido:r.valor_recebido||0,statusPagamento:r.status_pagamento||'pendente',statusFluxo:r.status_fluxo||'aguardando_consulta',logradouro:r.logradouro||'',numero:r.numero||'',complemento:r.complemento||'',bairro:r.bairro||'',cidade:r.cidade||'',estado:r.estado||'',cep:r.cep||'',pais:r.pais||'Brasil',oduResultado:r.odu_resultado||'',oduDescricao:r.odu_descricao||'',consideracoesGerais:r.consideracoes_gerais||'',prescricaoRituais:r.prescricao_rituais||'',prescricaoMedicinas:r.prescricao_medicinas||'',observacoesPrescricao:r.observacoes_prescricao||'',prescricaoEbos:r.prescricao_ebos||[],comprovante:r.comprovante||''}}
+function consToDB(c){return {id:c.id||undefined,pessoa_id:c.pessoaId||null,nome_completo:c.nomeCompleto,nome_mae:c.nomeMae||'',data_nascimento:c.dataNascimento||null,telefone_whatsapp:c.telefoneWhatsApp||'',data_consulta:c.dataConsulta||null,horario_consulta:c.horarioConsulta||'',formato_consulta:c.formatoConsulta||'',origem:c.origem||'',tipo_consulta:c.tipoConsulta||'normal',forma_pagamento:c.formaPagamento||'',valor_cobrado:c.valorCobrado||0,valor_recebido:c.valorRecebido||0,status_pagamento:c.statusPagamento||'pendente',status_fluxo:c.statusFluxo||'aguardando_consulta',logradouro:c.logradouro||'',numero:c.numero||'',complemento:c.complemento||'',bairro:c.bairro||'',cidade:c.cidade||'',estado:c.estado||'',cep:c.cep||'',pais:c.pais||'Brasil',odu_resultado:c.oduResultado||'',odu_descricao:c.oduDescricao||'',consideracoes_gerais:c.consideracoesGerais||'',prescricao_rituais:c.prescricaoRituais||'',prescricao_medicinas:c.prescricaoMedicinas||'',observacoes_prescricao:c.observacoesPrescricao||'',prescricao_ebos:normalizeItems(c.prescricaoEbos,'ebo'),prescricao_medicinas_itens:normalizeItems(c.prescricaoMedicinasItens,'medicina'),registro_pagamentos:c.registroPagamentos||[],comprovante:c.comprovante||''}}
+function consFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,nomeCompleto:r.nome_completo,nomeMae:r.nome_mae||'',dataNascimento:r.data_nascimento||'',telefoneWhatsApp:r.telefone_whatsapp||'',dataConsulta:r.data_consulta||'',horarioConsulta:r.horario_consulta||'',formatoConsulta:r.formato_consulta||'',origem:r.origem||'',tipoConsulta:r.tipo_consulta||'normal',formaPagamento:r.forma_pagamento||'',valorCobrado:r.valor_cobrado||0,valorRecebido:r.valor_recebido||0,statusPagamento:r.status_pagamento||'pendente',statusFluxo:r.status_fluxo||'aguardando_consulta',logradouro:r.logradouro||'',numero:r.numero||'',complemento:r.complemento||'',bairro:r.bairro||'',cidade:r.cidade||'',estado:r.estado||'',cep:r.cep||'',pais:r.pais||'Brasil',oduResultado:r.odu_resultado||'',oduDescricao:r.odu_descricao||'',consideracoesGerais:r.consideracoes_gerais||'',prescricaoRituais:r.prescricao_rituais||'',prescricaoMedicinas:r.prescricao_medicinas||'',observacoesPrescricao:r.observacoes_prescricao||'',prescricaoEbos:normalizeItems(r.prescricao_ebos,'ebo'),prescricaoMedicinasItens:normalizeItems(r.prescricao_medicinas_itens,'medicina'),registroPagamentos:r.registro_pagamentos||[],comprovante:r.comprovante||''}}
 function vendaToDB(v){return {id:v.id||undefined,pessoa_id:v.pessoaId||null,data:v.data||today(),itens:v.itens||[],subtotal:v.subtotal||0,valor_frete:v.valorFrete||0,total_com_frete:v.totalComFrete||0,tipo_frete:v.tipoFrete||'',forma_pagamento:v.formaPagamento||'',status:v.status||'pedido_feito',codigo_rastreio:v.codigoRastreio||'',comprovante:v.comprovante||''}}
 function vendaFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,data:r.data||'',itens:r.itens||[],subtotal:r.subtotal||0,valorFrete:r.valor_frete||0,totalComFrete:r.total_com_frete||0,tipoFrete:r.tipo_frete||'',formaPagamento:r.forma_pagamento||'',status:r.status||'pedido_feito',codigoRastreio:r.codigo_rastreio||'',comprovante:r.comprovante||''}}
 function cicloToDB(c){return {id:c.id||undefined,pessoa_id:c.pessoaId||null,tipo:c.tipo||'',data_inicio:c.dataInicio||today(),data_fim:c.dataFim||null,status:c.status||'ativo',observacoes:c.observacoes||''}}
@@ -372,6 +438,8 @@ function ritualFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,consulenteId:r.con
 
 // Debounced save for a specific table
 // Save individual record - direct PATCH, no debounce
+// Columns that may not exist in the user's DB yet; stripped on retry if 400
+var _OPTIONAL_COLS={consulentes:['prescricao_ebos','prescricao_medicinas_itens','registro_pagamentos']};
 async function saveRecord(table,id,data){
 try{
 
@@ -379,6 +447,18 @@ try{
   delete d.id;
 
   var resp = await sbPatch(table,'?id=eq.'+id,d);
+
+  if(!resp.ok && resp.status===400 && _OPTIONAL_COLS[table]){
+    // Retry without optional columns that may not exist in user's schema
+    var d2=Object.assign({},d);
+    var stripped=[];
+    _OPTIONAL_COLS[table].forEach(function(k){if(k in d2){stripped.push(k);delete d2[k]}});
+    if(stripped.length){
+      console.warn('[schema] Retrying '+table+' save without columns:',stripped.join(', '),'— please run the SQL migration in Supabase');
+      resp=await sbPatch(table,'?id=eq.'+id,d2);
+      if(resp.ok)toast('Salvo (sem: '+stripped.join(',')+'). Execute a migração SQL.','warn');
+    }
+  }
 
   if(resp.ok){
     _lastSyncStatus = 'ok';
@@ -412,6 +492,17 @@ try{
   delete d.id;
 
   var resp = await sbPost(table, d);
+
+  if(!resp.ok && resp.status===400 && _OPTIONAL_COLS[table]){
+    var d2=Object.assign({},d);
+    var stripped=[];
+    _OPTIONAL_COLS[table].forEach(function(k){if(k in d2){stripped.push(k);delete d2[k]}});
+    if(stripped.length){
+      console.warn('[schema] Retrying '+table+' insert without columns:',stripped.join(', '),'— please run the SQL migration in Supabase');
+      resp=await sbPost(table,d2);
+      if(resp.ok)toast('Criado (sem: '+stripped.join(',')+'). Execute a migração SQL.','warn');
+    }
+  }
 
   if(resp.ok){
     var rows = await resp.json();
@@ -879,7 +970,7 @@ var bs={};STATUS_FLUXO.forEach(function(s){bs[s.key]=[]});S.consulentes.forEach(
 var alerts=getPrescAlerts();var pendingOrders=S.vendas.filter(function(v){return v.status!=='concluido'&&v.status!=='cancelado'});
 var delAlerts=S.notifications.filter(function(n){return n.tipo==='alerta_exclusao'});
 var h='<div class="report-cards"><div class="report-card"><div class="rc-label">Consulentes</div><div class="rc-value">'+S.consulentes.length+'</div></div><div class="report-card"><div class="rc-label">Clientes</div><div class="rc-value">'+S.pessoas.length+'</div></div><div class="report-card" style="border-left-color:var(--warning)"><div class="rc-label">Pedidos Ativos</div><div class="rc-value">'+pendingOrders.length+'</div></div>';
-STATUS_FLUXO.slice(0,5).forEach(function(s){var cnt=bs[s.key].length;if(s.key==='ebo_em_andamento')cnt+=S.rituais.filter(function(r){return r.status==='em_andamento'}).length;h+='<div class="report-card" style="border-left-color:'+s.color+'"><div class="rc-label">'+s.label+'</div><div class="rc-value">'+cnt+'</div></div>'});
+['aguardando_consulta','aguardando_prescricao','aguardando_decisao','aguardando_ebo','ebo_em_andamento','aguardando_medicina'].forEach(function(key){var s=STATUS_FLUXO.find(function(x){return x.key===key});if(!s)return;var cnt=(bs[s.key]||[]).length;if(s.key==='ebo_em_andamento')cnt+=S.rituais.filter(function(r){return r.status==='em_andamento'}).length;h+='<div class="report-card" style="border-left-color:'+s.color+'"><div class="rc-label">'+s.label+'</div><div class="rc-value">'+cnt+'</div></div>'});
 h+='</div>';
 // Alerts section - only for admin, babalawo, secretario
 if(hasRole(['admin','babalawo','secretario'])){
@@ -888,10 +979,53 @@ if(alerts.length){h+='<div class="chart-container" style="border-left:4px solid 
 if(S.notifications.length){h+='<div class="chart-container"><div class="chart-title">Notificações Recentes</div>';S.notifications.slice(0,5).forEach(function(n){h+='<div style="padding:4px 10px;margin-bottom:3px;font-size:12px;color:var(--text2)">'+esc(n.tipo)+': '+esc(n.nome)+' \u2022 '+esc(n.time)+'</div>'});h+='</div>'}
 }
 // Kanban
-var k='<div class="kanban-grid">';STATUS_FLUXO.forEach(function(s){var colCount=bs[s.key].length;var ritCol=[];if(s.key==='ebo_em_andamento'){ritCol=S.rituais.filter(function(r){return r.status==='em_andamento'});colCount+=ritCol.length}k+='<div class="kanban-col"><div class="kanban-header">'+esc(s.label)+'<span class="kanban-count">'+colCount+'</span></div>';bs[s.key].forEach(function(c){var pd=0;if(c.statusFluxo==='aguardando_prescricao'&&c.dataConsulta)pd=daysDiff(c.dataConsulta,today());k+='<div class="kanban-card" style="border-left-color:'+s.color+'"><h4>'+esc(c.nomeCompleto)+'</h4><div class="kc-sub">'+fmtDate(c.dataConsulta)+' <span class="pag-badge pag-'+c.statusPagamento+'">'+pagLabel(c.statusPagamento)+'</span></div>';if(pd>=3)k+='<div style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--danger-bg);color:var(--danger);margin-bottom:4px">'+pd+'d sem prescrição</div>';k+='<div class="kc-actions">';var idx=STATUS_FLUXO.findIndex(function(x){return x.key===s.key});if(idx>0&&s.key!=='cancelado')k+='<button class="btn btn-sm btn-outline" onclick="revertCons('+c.id+')">\u25C0</button>';if(idx<5&&s.key!=='concluido'&&s.key!=='cancelado')k+='<button class="btn btn-sm btn-success" onclick="advanceCons('+c.id+')">Avançar</button>';if(s.key==='aguardando_consulta'){k+='<button class="btn btn-sm btn-info" onclick="openConfirmConsulta('+c.id+')">Confirmar</button>';k+='<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="confirmDelConsulta('+c.id+')">Excluir</button>';k+='<button class="btn btn-sm btn-outline" style="color:var(--warning);border-color:var(--warning)" onclick="concluirCicloConsulta('+c.id+')">Concluir Ciclo</button>'}if(s.key==='aguardando_prescricao')k+='<button class="btn btn-sm btn-warning" onclick="goPrescrPage('+c.id+')">Prescrição</button>';if(s.key==='aguardando_ebo'){k+='<button class="btn btn-sm btn-warning" onclick="goPrescrPage('+c.id+')">Prescrição</button>';k+='<button class="btn btn-sm btn-info" onclick="gerarEbo(getCons('+c.id+'))">Ebó</button>'}k+='<button class="btn btn-sm btn-outline" onclick="openChangeConsPag('+c.id+')">Pag.</button><button class="btn btn-sm btn-outline" onclick="openViewCons('+c.id+')">Ver</button></div></div>'});
+var k='<div class="kanban-grid">';
+STATUS_FLUXO.forEach(function(s){
+// Hide the Arquivado column from default kanban (still accessible via toggle if added later)
+if(s.key==='arquivado'&&!(S.showArquivados))return;
+var list=bs[s.key];
+var colCount=list.length;
+var ritCol=[];
+if(s.key==='ebo_em_andamento'){ritCol=S.rituais.filter(function(r){return r.status==='em_andamento'});colCount+=ritCol.length}
+k+='<div class="kanban-col"><div class="kanban-header">'+esc(s.label)+'<span class="kanban-count">'+colCount+'</span></div>';
+list.forEach(function(c){
+var st=consStats(c);
+var pd=0;if(c.statusFluxo==='aguardando_prescricao'&&c.dataConsulta)pd=daysDiff(c.dataConsulta,today());
+var pagReg=(c.registroPagamentos||[]).reduce(function(a,b){return a+(parseFloat(b.valor)||0)},0);
+k+='<div class="kanban-card" style="border-left-color:'+s.color+'"><h4>'+esc(c.nomeCompleto)+'</h4>';
+k+='<div class="kc-sub">'+fmtDate(c.dataConsulta)+' <span class="pag-badge pag-'+c.statusPagamento+'">'+pagLabel(c.statusPagamento)+'</span></div>';
+if(pd>=3)k+='<div style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--danger-bg);color:var(--danger);margin-bottom:4px">'+pd+'d sem prescrição</div>';
+// Stats line for any status with items
+if(st.temItens){
+var pieces=[];
+if(st.aceitosEbos.length)pieces.push(st.aceitosEbos.length+' ebó'+(st.aceitosEbos.length>1?'s':'')+' aceito'+(st.aceitosEbos.length>1?'s':''));
+if(st.aceitosMeds.length)pieces.push(st.aceitosMeds.length+' medicina'+(st.aceitosMeds.length>1?'s':'')+' aceita'+(st.aceitosMeds.length>1?'s':''));
+if(st.pendentesDecisao.length)pieces.push(st.pendentesDecisao.length+' s/ decisão');
+if(st.recusados.length)pieces.push(st.recusados.length+' recusado'+(st.recusados.length>1?'s':''));
+if(pieces.length)k+='<div style="font-size:11px;color:var(--text2);margin-bottom:4px">'+pieces.join(' \u2022 ')+'</div>';
+if(st.totalAceito>0)k+='<div style="font-size:11px;color:var(--text2);margin-bottom:4px">Pago R$'+pagReg.toFixed(0)+' / R$'+st.totalAceito.toFixed(0)+'</div>'}
+k+='<div class="kc-actions">';
+var idx=FLUXO_LINEAR.indexOf(c.statusFluxo);
+if(idx>0&&c.statusFluxo!=='cancelado'&&c.statusFluxo!=='arquivado')k+='<button class="btn btn-sm btn-outline" onclick="revertCons('+c.id+')">\u25C0</button>';
+if(idx>=0&&idx<FLUXO_LINEAR.length-1&&c.statusFluxo!=='cancelado')k+='<button class="btn btn-sm btn-success" onclick="advanceCons('+c.id+')">Avançar</button>';
+if(s.key==='aguardando_consulta'){
+k+='<button class="btn btn-sm btn-info" onclick="openConfirmConsulta('+c.id+')">Confirmar</button>';
+k+='<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="confirmDelConsulta('+c.id+')">Excluir</button>';
+k+='<button class="btn btn-sm btn-outline" style="color:var(--warning);border-color:var(--warning)" onclick="concluirCicloConsulta('+c.id+')">Concluir Ciclo</button>'}
+if(s.key==='aguardando_prescricao')k+='<button class="btn btn-sm btn-warning" onclick="goPrescrPage('+c.id+')">Prescrição</button>';
+if(st.temItens)k+='<button class="btn btn-sm btn-purple" onclick="openGestaoItens('+c.id+')">Gestão</button>';
+if(s.key==='aguardando_ebo'||s.key==='ebo_em_andamento')k+='<button class="btn btn-sm btn-info" onclick="gerarEbo(getCons('+c.id+'))">Ebó PDF</button>';
+if(s.key==='arquivado')k+='<button class="btn btn-sm btn-info" onclick="retomarCiclo('+c.id+')">Retomar</button>';
+k+='<button class="btn btn-sm btn-outline" onclick="openChangeConsPag('+c.id+')">Pag.</button>';
+k+='<button class="btn btn-sm btn-outline" onclick="openViewCons('+c.id+')">Ver</button>';
+k+='</div></div>'});
 // Ritual cards in ebo_em_andamento column
-if(s.key==='ebo_em_andamento'){ritCol.forEach(function(r){var pe=getPessoa(r.pessoaId);var nome=pe?pe.nome:'?';var neb=(r.ebos||[]).length;var tot=(parseFloat(r.valor)||0);(r.ebos||[]).forEach(function(e){tot+=parseFloat(e.valor)||0});k+='<div class="kanban-card" style="border-left-color:'+s.color+'"><h4>\u2728 '+esc(r.titulo)+'</h4><div class="kc-sub">'+esc(nome)+' \u2022 '+neb+' ebó(s) \u2022 R$'+tot.toFixed(2).replace('.',',')+'</div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Ritual avulso • '+fmtDate(r.data)+'</div><div class="kc-actions"><button class="btn btn-sm btn-success" onclick="advanceRitual('+r.id+')">Concluir</button>'+(pe?'<button class="btn btn-sm btn-outline" onclick="goPerfil('+pe.id+')">Ver</button>':'')+'<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="confirmDelRitual('+r.id+')">Excluir</button></div></div>'})}
-k+='</div>'});k+='</div>';
+if(s.key==='ebo_em_andamento'){ritCol.forEach(function(r){var pe=getPessoa(r.pessoaId);var nome=pe?pe.nome:'?';var neb=(r.ebos||[]).length;var tot=(parseFloat(r.valor)||0);(r.ebos||[]).forEach(function(e){tot+=parseFloat(e.valor)||0});k+='<div class="kanban-card" style="border-left-color:'+s.color+'"><h4>\u2728 '+esc(r.titulo)+'</h4><div class="kc-sub">'+esc(nome)+' \u2022 '+neb+' ebó(s) \u2022 R$'+tot.toFixed(2).replace('.',',')+'</div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Ritual avulso \u2022 '+fmtDate(r.data)+'</div><div class="kc-actions"><button class="btn btn-sm btn-success" onclick="advanceRitual('+r.id+')">Concluir</button>'+(pe?'<button class="btn btn-sm btn-outline" onclick="goPerfil('+pe.id+')">Ver</button>':'')+'<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="confirmDelRitual('+r.id+')">Excluir</button></div></div>'})}
+k+='</div>'});
+k+='</div>';
+// Show archived toggle
+var arqCount=S.consulentes.filter(function(c){return c.statusFluxo==='arquivado'}).length;
+if(arqCount||S.showArquivados)k=k.replace('<div class="kanban-grid">','<div style="text-align:right;margin-bottom:8px"><button class="btn btn-sm btn-outline" onclick="S.showArquivados=!S.showArquivados;render()">'+(S.showArquivados?'Ocultar':'Mostrar')+' arquivados ('+arqCount+')</button></div><div class="kanban-grid">');
 return h+k}
 
 // === DASHBOARD VENDAS ===
@@ -936,9 +1070,12 @@ return stats+'<div class="search-section"><div class="search-bar"><input class="
 function renderPrescricaoPage(){
 var c=getCons(S.viewConsId);if(!c)return '<div class="empty-state">Não encontrado</div>';
 var p=c.pessoaId?getPessoa(c.pessoaId):null;
-// Initialize prescEbos from consulente on first render
+// Initialize prescEbos/prescMeds from consulente on first render
 if(!S._prescInitFor||S._prescInitFor!==c.id){
-S.prescEbos=(c.prescricaoEbos&&c.prescricaoEbos.length)?JSON.parse(JSON.stringify(c.prescricaoEbos)):[{titulo:'',descricao:'',valor:0}];
+var eb=normalizeItems(c.prescricaoEbos,'ebo');
+var md=normalizeItems(c.prescricaoMedicinasItens,'medicina');
+S.prescEbos=eb.length?JSON.parse(JSON.stringify(eb)):[normalizeItem({},'ebo')];
+S.prescMeds=md.length?JSON.parse(JSON.stringify(md)):[normalizeItem({},'medicina')];
 S._prescInitFor=c.id}
 var h='<div style="margin-bottom:8px"><button class="btn btn-sm btn-outline" onclick="setTab(\'dashboard\')">\u2190 Voltar</button></div>';
 h+='<div class="profile-card"><h3 style="font-family:Playfair Display,serif;color:var(--accent)">Prescrição \u2014 '+esc(c.nomeCompleto)+'</h3><div class="profile-sub" style="margin-bottom:16px">'+fmtDate(c.dataConsulta)+' '+esc(c.horarioConsulta||'')+' \u2022 Mãe: '+esc(c.nomeMae||'\u2014')+' \u2022 <span class="status-badge st-'+c.statusFluxo+'">'+statusLabel(c.statusFluxo)+'</span></div>';
@@ -950,11 +1087,11 @@ var ids=['prConsGerais','prRituais','prMedicinas','prObs'];
 var vals=[c.consideracoesGerais||'',c.prescricaoRituais||'',c.prescricaoMedicinas||'',c.observacoesPrescricao||''];
 h+='<div style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:16px"><div style="font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">'+title+'</div><textarea id="'+ids[i]+'" rows="10" style="width:100%;border:1px solid var(--border2);border-radius:var(--radius);padding:10px;font-size:13px;line-height:1.6;resize:vertical;font-family:inherit">'+esc(vals[i])+'</textarea></div>'});
 h+='</div>';
-// ====== RITUALIDADES SECTION ======
+// ====== RITUALIDADES (EBÓS) SECTION ======
 var pe=S.prescEbos||[];
 var ebosTotal=0;pe.forEach(function(e){ebosTotal+=parseFloat(e.valor)||0});
-h+='<fieldset style="border:1.5px solid var(--purple);border-radius:var(--radius-lg);padding:16px;margin-top:20px;background:var(--purple-bg)"><legend style="font-size:13px;font-weight:700;padding:0 8px;color:var(--purple);text-transform:uppercase;letter-spacing:1px">Ritualidades (Ebós) — '+pe.length+'</legend>';
-h+='<div style="font-size:12px;color:var(--text2);margin-bottom:10px">Ebós prescritos a partir desta consulta. Serão contados no sistema.</div>';
+h+='<fieldset style="border:1.5px solid var(--purple);border-radius:var(--radius-lg);padding:16px;margin-top:20px;background:var(--purple-bg)"><legend style="font-size:13px;font-weight:700;padding:0 8px;color:var(--purple);text-transform:uppercase;letter-spacing:1px">Ritualidades (Ebós) \u2014 '+pe.length+'</legend>';
+h+='<div style="font-size:12px;color:var(--text2);margin-bottom:10px">Ebós prescritos a partir desta consulta. A aceitação e execução são gerenciadas na tela de Gestão de Itens.</div>';
 pe.forEach(function(e,i){
 h+='<div class="ebo-block"><div class="ebo-header"><span class="ebo-num">Ebó #'+(i+1)+'</span>'+((pe.length>1)?'<button type="button" class="ebo-remove" onclick="removePrescEbo('+i+')">Remover</button>':'')+'</div>'+
 '<div class="form-group"><label>Título</label><input type="text" id="peTit'+i+'" value="'+esc(e.titulo||'')+'" onchange="S.prescEbos['+i+'].titulo=this.value" placeholder="Ex: Ebó para Esu com o Odù Obara Meji"></div>'+
@@ -963,7 +1100,20 @@ h+='<div class="ebo-block"><div class="ebo-header"><span class="ebo-num">Ebó #'
 '</div>'});
 h+='<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px"><button type="button" class="btn btn-sm btn-purple" onclick="addPrescEbo()">+ Adicionar Ebó</button><div style="font-weight:700;color:var(--purple)">Total Ebós: R$ '+ebosTotal.toFixed(2).replace('.',',')+'</div></div>';
 h+='</fieldset>';
-h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px;justify-content:center"><button class="btn btn-primary" onclick="salvarPrescricao()">Salvar</button><button class="btn btn-info" onclick="salvarPrescricao();gerarPrescricaoPDF(getCons('+c.id+'))">Gerar PDF</button><button class="btn btn-success" onclick="salvarPrescricao();advanceCons('+c.id+')">Salvar e Avançar</button></div></div>';
+// ====== MEDICINAS SECTION ======
+var pm=S.prescMeds||[];
+var medsTotal=0;pm.forEach(function(e){medsTotal+=parseFloat(e.valor)||0});
+h+='<fieldset style="border:1.5px solid #00695C;border-radius:var(--radius-lg);padding:16px;margin-top:20px;background:#E0F2F1"><legend style="font-size:13px;font-weight:700;padding:0 8px;color:#00695C;text-transform:uppercase;letter-spacing:1px">Medicinas \u2014 '+pm.length+'</legend>';
+h+='<div style="font-size:12px;color:var(--text2);margin-bottom:10px">Medicinas prescritas. Ao serem aceitas pelo consulente poderão gerar venda na esteira de envios.</div>';
+pm.forEach(function(e,i){
+h+='<div class="ebo-block"><div class="ebo-header"><span class="ebo-num" style="color:#00695C">Medicina #'+(i+1)+'</span>'+((pm.length>1)?'<button type="button" class="ebo-remove" onclick="removePrescMed('+i+')">Remover</button>':'')+'</div>'+
+'<div class="form-group"><label>Título</label><input type="text" id="pmTit'+i+'" value="'+esc(e.titulo||'')+'" onchange="S.prescMeds['+i+'].titulo=this.value" placeholder="Ex: Banho de Oju Oro"></div>'+
+'<div class="ebo-row"><div class="form-group"><label>Descrição</label><textarea id="pmDesc'+i+'" rows="4" onchange="S.prescMeds['+i+'].descricao=this.value" placeholder="Detalhes, modo de uso, componentes...">'+esc(e.descricao||'')+'</textarea></div>'+
+'<div class="form-group"><label>Valor</label>'+currencyInput('pmVal'+i,e.valor,'0,00','S.prescMeds['+i+'].valor=parseFloat(this.value)||0;render()')+'</div></div>'+
+'</div>'});
+h+='<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px"><button type="button" class="btn btn-sm" style="background:#00695C;color:#fff" onclick="addPrescMed()">+ Adicionar Medicina</button><div style="font-weight:700;color:#00695C">Total Medicinas: R$ '+medsTotal.toFixed(2).replace('.',',')+'</div></div>';
+h+='</fieldset>';
+h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px;justify-content:center"><button class="btn btn-primary" onclick="salvarPrescricao()">Salvar</button><button class="btn btn-info" onclick="salvarPrescricao();gerarPrescricaoPDF(getCons('+c.id+'))">Gerar PDF</button>'+(pe.length||pm.length?'<button class="btn btn-purple" onclick="salvarPrescricao();openGestaoItens('+c.id+')">Gestão de Itens</button>':'')+'<button class="btn btn-success" onclick="salvarPrescricao();advanceCons('+c.id+')">Salvar e Avançar</button></div></div>';
 return h}
 
 // === ESTOQUE / RELATÓRIOS / CLIENTES / PERFIL / CICLO (keeping same as v5) ===
@@ -991,10 +1141,20 @@ function renderNotificacoes(){var alerts=getPrescAlerts();var h='<div style="mar
 function renderRelVendas(){var now=new Date();var start=new Date(now-30*864e5).toISOString().slice(0,10),end=today();if(S.reportPeriod==='semanal')start=new Date(now-7*864e5).toISOString().slice(0,10);else if(S.reportPeriod==='trimestral')start=new Date(now-90*864e5).toISOString().slice(0,10);else if(S.reportPeriod==='semestral')start=new Date(now-180*864e5).toISOString().slice(0,10);var vendas=S.vendas.filter(function(v){return v.data>=start&&v.data<=end});var tv=0;vendas.forEach(function(v){tv+=(v.totalComFrete||0)});var consC=S.consulentes.filter(function(c){return c.statusFluxo!=='aguardando_consulta'&&c.statusFluxo!=='cancelado'});var consP=consC.filter(function(c){return c.dataConsulta>=start&&c.dataConsulta<=end});var cNo=consP.filter(function(c){return (c.tipoConsulta||'normal')==='normal'});var cUr=consP.filter(function(c){return c.tipoConsulta==='urgencia'});var tcC=0,tcR=0;consP.forEach(function(c){tcC+=consValorCobrado(c);tcR+=consValorRecebido(c)});var cnC=0,cnR=0;cNo.forEach(function(c){cnC+=consValorCobrado(c);cnR+=consValorRecebido(c)});var cuC=0,cuR=0;cUr.forEach(function(c){cuC+=consValorCobrado(c);cuR+=consValorRecebido(c)});
 // Ebós/Rituais
 var ritP=S.rituais.filter(function(r){return r.data>=start&&r.data<=end});var nEbRit=0,vEbRit=0;ritP.forEach(function(r){nEbRit+=(r.ebos||[]).length;vEbRit+=parseFloat(r.valor)||0;(r.ebos||[]).forEach(function(e){vEbRit+=parseFloat(e.valor)||0})});
-var nEbPresc=0,vEbPresc=0;S.consulentes.forEach(function(c){if(c.dataConsulta>=start&&c.dataConsulta<=end&&Array.isArray(c.prescricaoEbos)){nEbPresc+=c.prescricaoEbos.length;c.prescricaoEbos.forEach(function(e){vEbPresc+=parseFloat(e.valor)||0})}});
-var nEbTot=nEbRit+nEbPresc;var vEbTot=vEbRit+vEbPresc;
+// Itens da prescrição: aceitos x recusados/arquivados
+var nEbPresc=0,vEbPrescAceito=0,nMedPresc=0,vMedPrescAceito=0;
+var nRecusados=0,vPotencialNaoRealizado=0;
+S.consulentes.forEach(function(c){
+if(!(c.dataConsulta>=start&&c.dataConsulta<=end))return;
+var st=consStats(c);
+st.aceitosEbos.forEach(function(e){nEbPresc++;vEbPrescAceito+=e.valor});
+st.aceitosMeds.forEach(function(m){nMedPresc++;vMedPrescAceito+=m.valor});
+st.recusados.forEach(function(r){nRecusados++;vPotencialNaoRealizado+=r.valor});
+st.all.forEach(function(x){if(x.aceito===true&&x.status==='arquivado'){nRecusados++;vPotencialNaoRealizado+=x.valor}})
+});
+var nEbTot=nEbRit+nEbPresc;var vEbTot=vEbRit+vEbPrescAceito;
 var tG=tv+tcR+vEbRit;
-return '<div class="search-section"><div class="filters"><select onchange="S.reportPeriod=this.value;render()"><option value="semanal"'+(S.reportPeriod==='semanal'?' selected':'')+'>Semanal</option><option value="mensal"'+(S.reportPeriod==='mensal'?' selected':'')+'>Mensal</option><option value="trimestral"'+(S.reportPeriod==='trimestral'?' selected':'')+'>Trimestral</option><option value="semestral"'+(S.reportPeriod==='semestral'?' selected':'')+'>Semestral</option></select></div></div><div class="report-cards"><div class="report-card" style="border-left-color:var(--success)"><div class="rc-label">Vendas</div><div class="rc-value">'+vendas.length+'</div><div class="rc-sub">R$'+tv.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:var(--info)"><div class="rc-label">Consultas Normal</div><div class="rc-value">'+cNo.length+'</div></div><div class="report-card" style="border-left-color:var(--danger)"><div class="rc-label">Consultas Urgência</div><div class="rc-value">'+cUr.length+'</div></div><div class="report-card" style="border-left-color:#CA6F1E"><div class="rc-label">Rituais Avulsos</div><div class="rc-value">'+ritP.length+'</div><div class="rc-sub">R$'+vEbRit.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:var(--purple)"><div class="rc-label">Ebós (Total)</div><div class="rc-value">'+nEbTot+'</div><div class="rc-sub">Avulsos: '+nEbRit+' + Prescritos: '+nEbPresc+' • R$'+vEbTot.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:var(--purple)"><div class="rc-label">Receita Consultas</div><div class="rc-value">R$'+tcR.toFixed(0)+'</div><div class="rc-sub">Cobrado: R$'+tcC.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:var(--accent)"><div class="rc-label">Total Geral</div><div class="rc-value">R$'+tG.toFixed(0)+'</div><div class="rc-sub">Vendas + Consultas + Rituais</div></div></div><div class="chart-container"><div class="chart-title">Consultas no Período</div><div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Tipo</th><th>Qtd</th><th>Cobrado</th><th>Recebido</th></tr></thead><tbody><tr><td>Normal</td><td>'+cNo.length+'</td><td>R$'+cnC.toFixed(2)+'</td><td>R$'+cnR.toFixed(2)+'</td></tr><tr><td>Urgência</td><td>'+cUr.length+'</td><td>R$'+cuC.toFixed(2)+'</td><td>R$'+cuR.toFixed(2)+'</td></tr><tr style="font-weight:700;background:var(--accent-bg)"><td>TOTAL</td><td>'+consP.length+'</td><td>R$'+tcC.toFixed(2)+'</td><td>R$'+tcR.toFixed(2)+'</td></tr></tbody></table></div></div></div>'}
+return '<div class="search-section"><div class="filters"><select onchange="S.reportPeriod=this.value;render()"><option value="semanal"'+(S.reportPeriod==='semanal'?' selected':'')+'>Semanal</option><option value="mensal"'+(S.reportPeriod==='mensal'?' selected':'')+'>Mensal</option><option value="trimestral"'+(S.reportPeriod==='trimestral'?' selected':'')+'>Trimestral</option><option value="semestral"'+(S.reportPeriod==='semestral'?' selected':'')+'>Semestral</option></select></div></div><div class="report-cards"><div class="report-card" style="border-left-color:var(--success)"><div class="rc-label">Vendas</div><div class="rc-value">'+vendas.length+'</div><div class="rc-sub">R$'+tv.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:var(--info)"><div class="rc-label">Consultas Normal</div><div class="rc-value">'+cNo.length+'</div></div><div class="report-card" style="border-left-color:var(--danger)"><div class="rc-label">Consultas Urgência</div><div class="rc-value">'+cUr.length+'</div></div><div class="report-card" style="border-left-color:#CA6F1E"><div class="rc-label">Rituais Avulsos</div><div class="rc-value">'+ritP.length+'</div><div class="rc-sub">R$'+vEbRit.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:var(--purple)"><div class="rc-label">Ebós Aceitos</div><div class="rc-value">'+nEbTot+'</div><div class="rc-sub">Avulsos: '+nEbRit+' + Prescritos: '+nEbPresc+' • R$'+vEbTot.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:#00695C"><div class="rc-label">Medicinas Aceitas</div><div class="rc-value">'+nMedPresc+'</div><div class="rc-sub">R$'+vMedPrescAceito.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:#C0392B"><div class="rc-label">Potencial Não Realizado</div><div class="rc-value" style="color:#C0392B">R$'+vPotencialNaoRealizado.toFixed(0)+'</div><div class="rc-sub">'+nRecusados+' itens recusados/arquivados</div></div><div class="report-card" style="border-left-color:var(--purple)"><div class="rc-label">Receita Consultas</div><div class="rc-value">R$'+tcR.toFixed(0)+'</div><div class="rc-sub">Cobrado: R$'+tcC.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:var(--accent)"><div class="rc-label">Total Geral</div><div class="rc-value">R$'+tG.toFixed(0)+'</div><div class="rc-sub">Vendas + Consultas + Rituais</div></div></div><div class="chart-container"><div class="chart-title">Consultas no Período</div><div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Tipo</th><th>Qtd</th><th>Cobrado</th><th>Recebido</th></tr></thead><tbody><tr><td>Normal</td><td>'+cNo.length+'</td><td>R$'+cnC.toFixed(2)+'</td><td>R$'+cnR.toFixed(2)+'</td></tr><tr><td>Urgência</td><td>'+cUr.length+'</td><td>R$'+cuC.toFixed(2)+'</td><td>R$'+cuR.toFixed(2)+'</td></tr><tr style="font-weight:700;background:var(--accent-bg)"><td>TOTAL</td><td>'+consP.length+'</td><td>R$'+tcC.toFixed(2)+'</td><td>R$'+tcR.toFixed(2)+'</td></tr></tbody></table></div></div></div>'}
 function renderUsuarios(){var h='<div style="margin-bottom:12px"><button class="btn btn-primary" onclick="openAddUser()">+ Usuário</button><button class="btn btn-outline" onclick="loadUsuarios()" style="margin-left:8px">Atualizar Lista</button></div>';if(!S._authUsers||!S._authUsers.length){h+='<div class="empty-state">Carregando usuários...<br><button class="btn btn-sm btn-info" onclick="loadUsuarios()">Carregar</button></div>';return h}S._authUsers.forEach(function(u){h+='<div class="user-card"><div class="user-info"><div class="user-avatar avatar-'+u.perfil+'">'+((u?.username || 'Usuario')[0]).toUpperCase()+'</div><div><div style="font-weight:500">'+esc(u.username || 'Usuario')+'</div><div style="font-size:12px;color:var(--text2)">'+u.perfil+'</div><div style="font-size:11px;color:var(--text3)">'+esc(u.email||'')+'</div></div></div><div style="display:flex;gap:6px"><button class="btn btn-sm btn-outline" onclick="openChgPwd(\''+esc(u.username)+'\')">Nova Senha</button></div></div>'});return h}
 function renderHistorico(){
 if(!S.history.length)return '<div class="empty-state">Nenhum registro</div>';
@@ -1036,6 +1196,7 @@ if(m==='flowCiclo')return mFlowCiclo();
 if(m==='flowVenda')return mFlowVenda();
 if(m==='flowConsulta')return mFlowConsulta();
 if(m==='flowRitual')return mFlowRitual();
+if(m==='gestaoItens')return mGestaoItens();
 if(m==='addCiclo')return mAddCiclo();if(m==='addInter'||m==='editInter')return mInter();
 if(m==='rastreio')return mRastreio();if(m==='confirmConsulta')return mConfirmConsulta();if(m==='changeConsPag')return mChangeConsPag();
 if(m==='addCrediario')return mAddCrediario();if(m==='pagCrediario')return mPagCrediario();
@@ -1133,6 +1294,106 @@ ebosHtml+
 '</fieldset>'+
 '<div class="ebo-total-bar"><span>TOTAL (Ritual + Ebós):</span><span>R$ '+total.toFixed(2).replace('.',',')+'</span></div>'+
 '<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="finishRitual()">Registrar Ritual</button></div></div></div>'}
+
+// ============ MODAL DE GESTÃO DE ITENS ============
+function mGestaoItens(){
+var c=getCons(S.gestaoConsId);if(!c)return '';
+var st=consStats(c);
+var pessoa=c.pessoaId?getPessoa(c.pessoaId):null;
+
+// Registro de pagamento agregado
+var pagRegistrado=(c.registroPagamentos||[]).reduce(function(a,b){return a+(parseFloat(b.valor)||0)},0);
+var saldoDevedor=Math.max(0,st.totalAceito-pagRegistrado);
+
+// Tabs
+var tab=S.gestaoTab||'todos';
+var items=[];
+if(tab==='ebos')items=st.ebos;
+else if(tab==='medicinas')items=st.meds;
+else items=st.all;
+
+var renderItemRow=function(it,idx){
+var kindColor=it.kind==='ebo'?'#6A1B9A':'#00695C';
+var kindLabel=it.kind==='ebo'?'Ebó':'Medicina';
+var aceitoBadge=it.aceito===true?'<span style="background:#E8F8F0;color:#1E8449;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600">ACEITO</span>':it.aceito===false?'<span style="background:#FDEDEC;color:#C0392B;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600">RECUSADO</span>':'<span style="background:#F5ECD4;color:#8B6914;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600">AGUARDA DECISÃO</span>';
+var statusBadge=it.aceito===true?'<span style="background:var(--bg2);color:var(--text2);padding:2px 8px;border-radius:6px;font-size:11px">'+itemStatusLabel(it.status)+'</span>':'';
+var pagPct=it.valor>0?Math.min(100,(it.valorPago/it.valor)*100):0;
+var out='<div style="background:var(--bg);border:1.5px solid var(--border);border-left:4px solid '+kindColor+';border-radius:var(--radius);padding:12px;margin-bottom:10px">';
+out+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><div style="font-size:11px;font-weight:700;color:'+kindColor+';letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">'+kindLabel+' \u00b7 R$ '+it.valor.toFixed(2).replace('.',',')+'</div><div style="font-weight:600;font-size:14px;line-height:1.3">'+esc(it.titulo)+'</div>'+(it.descricao?'<div style="font-size:12px;color:var(--text2);margin-top:3px">'+esc(it.descricao.substring(0,140))+(it.descricao.length>140?'...':'')+'</div>':'')+'</div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">'+aceitoBadge+statusBadge+'</div></div>';
+// Pagamento
+if(it.aceito===true){
+out+='<div style="background:var(--bg2);border-radius:6px;padding:8px;margin:6px 0;font-size:12px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Pago:</span><strong>R$ '+it.valorPago.toFixed(2).replace('.',',')+' / R$ '+it.valor.toFixed(2).replace('.',',')+'</strong></div><div style="height:6px;background:var(--border2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pagPct+'%;background:'+(pagPct>=100?'var(--success)':pagPct>0?'var(--warning)':'var(--border2)')+';transition:width .3s"></div></div></div>'}
+// Actions
+out+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">';
+if(it.aceito===null||it.aceito===false){
+out+='<button class="btn btn-sm btn-success" onclick="decidirItem(\''+it.kind+'\',\''+it.id+'\',true)">Aceitar</button>'}
+if(it.aceito===null||it.aceito===true){
+out+='<button class="btn btn-sm" style="background:#C0392B;color:#fff" onclick="decidirItem(\''+it.kind+'\',\''+it.id+'\',false)">Recusar</button>'}
+if(it.aceito===true){
+if(it.status==='pendente')out+='<button class="btn btn-sm btn-info" onclick="avancarItem(\''+it.kind+'\',\''+it.id+'\',\'em_andamento\')">Iniciar</button>';
+if(it.status==='em_andamento')out+='<button class="btn btn-sm btn-success" onclick="avancarItem(\''+it.kind+'\',\''+it.id+'\',\'concluido\')">Concluir</button>';
+if(it.status==='concluido')out+='<button class="btn btn-sm btn-outline" onclick="avancarItem(\''+it.kind+'\',\''+it.id+'\',\'em_andamento\')">Reabrir</button>';
+out+='<button class="btn btn-sm btn-outline" onclick="editarValorPagoItem(\''+it.kind+'\',\''+it.id+'\')">Valor pago</button>';
+if(it.kind==='medicina'&&!it.vendaId&&it.status!=='arquivado')out+='<button class="btn btn-sm" style="background:#00695C;color:#fff" onclick="gerarVendaDeMedicina(\''+it.id+'\')">Gerar venda</button>';
+if(it.vendaId)out+='<button class="btn btn-sm btn-outline" onclick="goPerfilFromVenda('+it.vendaId+')">Ver venda #'+it.vendaId+'</button>';
+}
+if(it.status!=='arquivado')out+='<button class="btn btn-sm btn-outline" style="color:var(--text3)" onclick="arquivarItem(\''+it.kind+'\',\''+it.id+'\')">Arquivar</button>';
+else out+='<button class="btn btn-sm btn-outline" onclick="retomarItem(\''+it.kind+'\',\''+it.id+'\')">Retomar</button>';
+out+='</div></div>';
+return out};
+
+var h='<div class="modal-overlay"'+MO()+'><div class="modal modal-wide" style="max-width:900px"><h3>Gestão de Itens \u2014 '+esc(c.nomeCompleto)+'</h3>';
+h+='<div style="font-size:13px;color:var(--text2);margin-bottom:12px">Consulta: '+fmtDate(c.dataConsulta)+' \u00b7 Status: <span class="status-badge st-'+c.statusFluxo+'">'+statusLabel(c.statusFluxo)+'</span></div>';
+
+// Summary cards
+h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px">';
+h+='<div style="background:var(--accent-bg);border-radius:8px;padding:10px"><div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px">Total Prescrito</div><div style="font-size:18px;font-weight:700;color:var(--accent)">R$ '+(st.totalAceito+st.totalPotencialNaoRealizado+st.pendentesDecisao.reduce(function(a,b){return a+b.valor},0)).toFixed(2).replace('.',',')+'</div><div style="font-size:11px;color:var(--text2)">'+st.all.length+' itens</div></div>';
+h+='<div style="background:#E8F8F0;border-radius:8px;padding:10px"><div style="font-size:11px;color:#1E8449;text-transform:uppercase;letter-spacing:.5px">Aceito</div><div style="font-size:18px;font-weight:700;color:#1E8449">R$ '+st.totalAceito.toFixed(2).replace('.',',')+'</div><div style="font-size:11px;color:var(--text2)">'+st.aceitos.length+' itens</div></div>';
+h+='<div style="background:#FDEDEC;border-radius:8px;padding:10px"><div style="font-size:11px;color:#C0392B;text-transform:uppercase;letter-spacing:.5px">Potencial Não Realizado</div><div style="font-size:18px;font-weight:700;color:#C0392B">R$ '+st.totalPotencialNaoRealizado.toFixed(2).replace('.',',')+'</div><div style="font-size:11px;color:var(--text2)">'+st.recusados.length+' recusados</div></div>';
+h+='<div style="background:#EBF5FB;border-radius:8px;padding:10px"><div style="font-size:11px;color:#2471A3;text-transform:uppercase;letter-spacing:.5px">Pago</div><div style="font-size:18px;font-weight:700;color:#2471A3">R$ '+pagRegistrado.toFixed(2).replace('.',',')+'</div><div style="font-size:11px;color:var(--text2)">Saldo: R$ '+saldoDevedor.toFixed(2).replace('.',',')+'</div></div>';
+h+='</div>';
+
+// Payment registration block
+h+='<div style="background:var(--bg2);border:1.5px dashed var(--border2);border-radius:var(--radius);padding:12px;margin-bottom:14px">';
+h+='<div style="font-weight:600;font-size:13px;margin-bottom:6px">Registrar Pagamento Agregado</div>';
+h+='<div style="font-size:11px;color:var(--text2);margin-bottom:8px">O valor será distribuído proporcionalmente entre os itens aceitos. Você pode ajustar manualmente o valor pago de cada item depois.</div>';
+h+='<div style="display:grid;grid-template-columns:1fr 140px 110px;gap:8px;align-items:end">';
+h+='<div class="form-group" style="margin:0"><label style="font-size:11px">Valor</label>'+currencyInput('gipVal',0,'0,00','')+'</div>';
+h+='<div class="form-group" style="margin:0"><label style="font-size:11px">Forma</label><select id="gipForma" style="padding:9px"><option>pix</option><option>cartao</option><option>dinheiro</option><option>transferencia</option></select></div>';
+h+='<button class="btn btn-primary" onclick="registrarPagamentoAgregado('+c.id+')">Registrar</button>';
+h+='</div>';
+// Existing payments list
+if((c.registroPagamentos||[]).length){
+h+='<div style="margin-top:8px;font-size:11px;color:var(--text2)">Pagamentos: ';
+c.registroPagamentos.forEach(function(p,i){h+='<span style="display:inline-block;margin:2px 4px;padding:2px 6px;background:var(--bg);border-radius:4px">R$'+(parseFloat(p.valor)||0).toFixed(2)+' ('+p.forma+', '+fmtDate(p.data)+') <a onclick="removerPagamentoAgregado('+c.id+','+i+')" style="color:var(--danger);cursor:pointer">×</a></span>'});
+h+='</div>'}
+h+='</div>';
+
+// Tabs
+h+='<div style="display:flex;gap:6px;border-bottom:2px solid var(--border);margin-bottom:12px">';
+[['todos','Todos ('+st.all.length+')'],['ebos','Ebós ('+st.ebos.length+')'],['medicinas','Medicinas ('+st.meds.length+')']].forEach(function(t){
+var active=tab===t[0];
+h+='<button onclick="S.gestaoTab=\''+t[0]+'\';render()" style="background:none;border:none;padding:8px 14px;cursor:pointer;font-weight:'+(active?'700':'500')+';color:'+(active?'var(--accent)':'var(--text2)')+';border-bottom:'+(active?'2px':'0')+' solid var(--accent);margin-bottom:-2px">'+t[1]+'</button>'});
+h+='</div>';
+
+// Items
+if(!items.length){
+h+='<div style="text-align:center;padding:40px;color:var(--text3)">Nenhum item nesta categoria.</div>'}
+else{
+items.forEach(function(it,idx){h+=renderItemRow(it,idx)})}
+
+// Footer actions
+h+='<div style="display:flex;gap:8px;justify-content:space-between;margin-top:16px;padding-top:12px;border-top:1.5px solid var(--border);flex-wrap:wrap">';
+h+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+h+='<button class="btn btn-outline" onclick="arquivarCiclo('+c.id+')">Arquivar Ciclo</button>';
+if(c.statusFluxo==='arquivado')h+='<button class="btn btn-info" onclick="retomarCiclo('+c.id+')">Retomar Ciclo</button>';
+h+='<button class="btn btn-success" onclick="finalizarCiclo('+c.id+')">Finalizar Ciclo</button>';
+h+='</div>';
+h+='<button class="btn btn-primary" onclick="closeModal()">Fechar</button>';
+h+='</div>';
+
+h+='</div></div>';
+return h}
 
 function mAddCiclo(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Novo Ciclo</h3><div class="form-group"><label>Obs</label><textarea id="ciObs" rows="3"></textarea></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveNewCiclo()">Criar</button></div></div></div>'}
 function mInter(){var isE=S.modal==='editInter';var e=isE?S.interacoes.find(function(x){return x.id===S.editItem}):null;return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>'+(isE?'Editar':'Nova')+' Interação</h3><div class="form-group"><label>Tipo</label><select id="itTipo">'+TIPO_INTERACAO.map(function(t){return '<option value="'+t+'"'+(e&&e.tipo===t?' selected':'')+'>'+interLabel(t)+'</option>'}).join('')+'</select></div><div class="form-group"><label>Data</label><input type="date" id="itData" value="'+(e?e.data:today())+'"></div><div class="form-group"><label>Desc</label><textarea id="itDesc" rows="3">'+esc(e?e.descricao:'')+'</textarea></div><div class="form-group"><label>Valor</label><input id="itVal" value="'+esc(e?e.valor:'')+'"></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveInter()">Salvar</button></div></div></div>'}
@@ -1327,6 +1588,178 @@ S.confirmText='<strong>Excluir ritual "'+esc(r.titulo)+'"?</strong><br>Esta aç�
 S.confirmAction=async function(){await deleteRecord('rituais',r.id);S.rituais=S.rituais.filter(function(x){return x.id!==id});addHistDB('- Ritual excluído: '+r.titulo);toast('Ritual excluído!','info');render()};
 S.modal='confirm';render()};
 
+// ============ GESTÃO DE ITENS DE PRESCRIÇÃO ============
+window.openGestaoItens=function(id){S.gestaoConsId=id;S.gestaoTab='todos';S.modal='gestaoItens';render()};
+
+// Find & mutate an item by kind+id in the cons object
+function _findItem(c,kind,id){
+var arr=kind==='ebo'?normalizeItems(c.prescricaoEbos,'ebo'):normalizeItems(c.prescricaoMedicinasItens,'medicina');
+for(var i=0;i<arr.length;i++)if(arr[i].id===id)return {arr:arr,item:arr[i],idx:i};
+return null}
+
+function _writeBack(c,kind,arr){if(kind==='ebo')c.prescricaoEbos=arr;else c.prescricaoMedicinasItens=arr}
+
+// Distribute paid amount proportionally to accepted items
+function _redistribuirPagamento(c){
+var pagRegistrado=(c.registroPagamentos||[]).reduce(function(a,b){return a+(parseFloat(b.valor)||0)},0);
+var ebos=normalizeItems(c.prescricaoEbos,'ebo');
+var meds=normalizeItems(c.prescricaoMedicinasItens,'medicina');
+var aceitos=ebos.concat(meds).filter(function(x){return x.aceito===true});
+var totalAceito=aceitos.reduce(function(a,b){return a+b.valor},0);
+// Identify items with manual valorPago override (marked by _manualPago flag)
+var manualTotal=0;aceitos.forEach(function(x){if(x._manualPago)manualTotal+=x.valorPago});
+var restante=Math.max(0,pagRegistrado-manualTotal);
+var autoItems=aceitos.filter(function(x){return !x._manualPago});
+var autoTotal=autoItems.reduce(function(a,b){return a+b.valor},0);
+autoItems.forEach(function(x){
+if(autoTotal<=0){x.valorPago=0;return}
+var share=(x.valor/autoTotal)*restante;
+x.valorPago=Math.min(x.valor,Math.round(share*100)/100)});
+c.prescricaoEbos=ebos;
+c.prescricaoMedicinasItens=meds}
+
+window.decidirItem=async function(kind,id,aceito){
+var c=getCons(S.gestaoConsId);if(!c)return;
+var f=_findItem(c,kind,id);if(!f)return;
+f.item.aceito=aceito;
+f.item.dataDecisao=today();
+if(!aceito){f.item.status='arquivado'}
+else if(f.item.status==='arquivado'){f.item.status='pendente'}
+_writeBack(c,kind,f.arr);
+_redistribuirPagamento(c);
+c.statusFluxo=deriveStatusFluxo(c);
+await saveRecord('consulentes',c.id,consToDB(c));
+addHistDB(c.nomeCompleto+' \u2022 '+(kind==='ebo'?'Ebó':'Medicina')+' '+f.item.titulo+' \u2192 '+(aceito?'aceito':'recusado'));
+render()};
+
+window.avancarItem=async function(kind,id,novoStatus){
+var c=getCons(S.gestaoConsId);if(!c)return;
+var f=_findItem(c,kind,id);if(!f)return;
+f.item.status=novoStatus;
+if(novoStatus==='concluido')f.item.dataConclusao=today();
+_writeBack(c,kind,f.arr);
+c.statusFluxo=deriveStatusFluxo(c);
+await saveRecord('consulentes',c.id,consToDB(c));
+addHistDB(c.nomeCompleto+' \u2022 '+f.item.titulo+' \u2192 '+itemStatusLabel(novoStatus));
+render()};
+
+window.editarValorPagoItem=async function(kind,id){
+var c=getCons(S.gestaoConsId);if(!c)return;
+var f=_findItem(c,kind,id);if(!f)return;
+var txt=prompt('Valor pago para "'+f.item.titulo+'" (R$):',f.item.valorPago.toFixed(2));
+if(txt===null)return;
+var v=parseFloat((txt||'').replace(',','.'))||0;
+f.item.valorPago=Math.max(0,Math.min(f.item.valor,v));
+f.item._manualPago=true;
+_writeBack(c,kind,f.arr);
+_redistribuirPagamento(c);
+await saveRecord('consulentes',c.id,consToDB(c));
+addHistDB(c.nomeCompleto+' \u2022 Pag. manual: '+f.item.titulo+' R$'+f.item.valorPago.toFixed(2));
+render()};
+
+window.arquivarItem=async function(kind,id){
+var c=getCons(S.gestaoConsId);if(!c)return;
+var f=_findItem(c,kind,id);if(!f)return;
+f.item.status='arquivado';
+f.item.dataDecisao=f.item.dataDecisao||today();
+_writeBack(c,kind,f.arr);
+c.statusFluxo=deriveStatusFluxo(c);
+await saveRecord('consulentes',c.id,consToDB(c));
+addHistDB(c.nomeCompleto+' \u2022 '+f.item.titulo+' arquivado');
+render()};
+
+window.retomarItem=async function(kind,id){
+var c=getCons(S.gestaoConsId);if(!c)return;
+var f=_findItem(c,kind,id);if(!f)return;
+f.item.status='pendente';
+if(f.item.aceito===false)f.item.aceito=null;
+_writeBack(c,kind,f.arr);
+c.statusFluxo=deriveStatusFluxo(c);
+await saveRecord('consulentes',c.id,consToDB(c));
+addHistDB(c.nomeCompleto+' \u2022 '+f.item.titulo+' retomado');
+toast('Item retomado. Volta ao kanban.');
+render()};
+
+window.registrarPagamentoAgregado=async function(id){
+var c=getCons(id);if(!c)return;
+var valEl=document.getElementById('gipVal');if(!valEl)return;
+var v=parseFloat(valEl.value)||0;if(v<=0)return toast('Informe um valor válido','error');
+var forma=document.getElementById('gipForma').value;
+c.registroPagamentos=c.registroPagamentos||[];
+c.registroPagamentos.push({valor:v,forma:forma,data:today()});
+_redistribuirPagamento(c);
+// Also refresh legacy valor_recebido as sum of payments
+var totalPago=c.registroPagamentos.reduce(function(a,b){return a+(parseFloat(b.valor)||0)},0);
+c.valorRecebido=totalPago;
+if(totalPago>=(c.valorCobrado||0)*0.5)c.statusPagamento='50_pago';
+if(totalPago>=(c.valorCobrado||0))c.statusPagamento='pago';
+await saveRecord('consulentes',c.id,consToDB(c));
+addHistDB(c.nomeCompleto+' \u2022 Pag. agregado R$'+v.toFixed(2)+' ('+forma+')');
+toast('Pagamento registrado!');
+render()};
+
+window.removerPagamentoAgregado=async function(id,idx){
+var c=getCons(id);if(!c||!c.registroPagamentos)return;
+if(!confirm('Remover este pagamento?'))return;
+c.registroPagamentos.splice(idx,1);
+_redistribuirPagamento(c);
+var totalPago=c.registroPagamentos.reduce(function(a,b){return a+(parseFloat(b.valor)||0)},0);
+c.valorRecebido=totalPago;
+await saveRecord('consulentes',c.id,consToDB(c));
+addHistDB(c.nomeCompleto+' \u2022 Pag. removido');
+render()};
+
+window.arquivarCiclo=async function(id){
+var c=getCons(id);if(!c)return;
+if(!confirm('Arquivar este ciclo? O card sairá do kanban mas poderá ser retomado.'))return;
+c.statusFluxo='arquivado';
+await saveRecord('consulentes',c.id,consToDB(c));
+addHistDB(c.nomeCompleto+' \u2022 Ciclo arquivado');
+toast('Ciclo arquivado!','info');
+closeModal()};
+
+window.retomarCiclo=async function(id){
+var c=getCons(id);if(!c)return;
+c.statusFluxo=deriveStatusFluxo(Object.assign({},c,{statusFluxo:'aguardando_decisao'}));
+if(c.statusFluxo==='arquivado')c.statusFluxo='aguardando_decisao';
+await saveRecord('consulentes',c.id,consToDB(c));
+addHistDB(c.nomeCompleto+' \u2022 Ciclo retomado');
+toast('Ciclo retomado!');
+render()};
+
+window.finalizarCiclo=async function(id){
+var c=getCons(id);if(!c)return;
+var st=consStats(c);
+if(st.ebosPendExec.length||st.medsPendExec.length){
+if(!confirm('Existem itens aceitos pendentes de execução. Finalizar mesmo assim?'))return}
+if(st.recusados.length||st.pendentesDecisao.length){
+c.statusFluxo='arquivado';
+addHistDB(c.nomeCompleto+' \u2022 Ciclo finalizado \u2192 arquivado (há itens recusados/pendentes)')}
+else{c.statusFluxo='concluido';addHistDB(c.nomeCompleto+' \u2022 Ciclo concluído')}
+await saveRecord('consulentes',c.id,consToDB(c));
+toast('Ciclo finalizado!');
+closeModal()};
+
+window.gerarVendaDeMedicina=async function(itemId){
+var c=getCons(S.gestaoConsId);if(!c)return;
+var f=_findItem(c,'medicina',itemId);if(!f)return;
+var p=c.pessoaId?getPessoa(c.pessoaId):null;
+if(!p)return toast('Cliente não encontrado','error');
+// Create venda
+var nv={id:nid(S.vendas),pessoaId:p.id,data:today(),items:[{nome:f.item.titulo,qtd:1,valorUnit:f.item.valor,valorTotal:f.item.valor}],tipoFrete:'pac',valorFrete:0,totalItens:f.item.valor,totalComFrete:f.item.valor,status:'aguardando_pagamento',origem:'prescricao_medicina',codigoRastreio:'',observacoes:'Gerada da prescrição \u2014 '+c.nomeCompleto};
+var dbv=await insertRecord('vendas',vendaToDB(nv));if(dbv)nv.id=dbv.id;
+S.vendas.push(nv);
+f.item.vendaId=nv.id;
+f.item.status='em_andamento';
+_writeBack(c,'medicina',f.arr);
+c.statusFluxo=deriveStatusFluxo(c);
+await saveRecord('consulentes',c.id,consToDB(c));
+addHistDB(c.nomeCompleto+' \u2022 Venda #'+nv.id+' gerada para medicina: '+f.item.titulo);
+toast('Venda #'+nv.id+' criada!');
+render()};
+
+window.goPerfilFromVenda=function(vid){closeModal();setTab('vendas')};
+
 // Venda status
 window.moveVenda=function(id,dir){var v=getVenda(id);if(!v)return;var idx=STATUS_VENDA.findIndex(function(s){return s.key===v.status});var ni=idx+dir;if(ni>=0&&ni<STATUS_VENDA.length){v.status=STATUS_VENDA[ni].key;saveRecord('vendas',v.id,vendaToDB(v));addHistDB('Venda #'+id+' \u2192 '+vendaStatusLabel(v.status));render()}};
 window.addRastreio=function(id){S.viewVendaId=id;S.modal='rastreio';render()};
@@ -1335,8 +1768,10 @@ window.saveRastreio=function(){var v=getVenda(S.viewVendaId);if(v){v.codigoRastr
 // Consulente advance/revert
 window.getCons=getCons;
 window.openViewCons=function(id){S.editConsulente=getCons(id);S.modal='viewCons';render()};
-window.advanceCons=function(id){var c=getCons(id);if(!c)return;var idx=STATUS_FLUXO.findIndex(function(s){return s.key===c.statusFluxo});if(idx>=0&&idx<5){c.statusFluxo=STATUS_FLUXO[idx+1].key;saveRecord('consulentes',c.id,consToDB(c));addHistDB(c.nomeCompleto+' \u2192 '+statusLabel(c.statusFluxo));toast('Avançado!');render()}};
-window.revertCons=function(id){var c=getCons(id);if(!c)return;var idx=STATUS_FLUXO.findIndex(function(s){return s.key===c.statusFluxo});if(idx>0){c.statusFluxo=STATUS_FLUXO[idx-1].key;saveRecord('consulentes',c.id,consToDB(c));addHistDB(c.nomeCompleto+' \u2190 '+statusLabel(c.statusFluxo));toast('Voltou!');render()}};
+// Linear progression for manual advance/revert (excludes terminal/branch states)
+var FLUXO_LINEAR=['aguardando_consulta','aguardando_prescricao','aguardando_decisao','aguardando_ebo','ebo_em_andamento','aguardando_medicina','concluido'];
+window.advanceCons=function(id){var c=getCons(id);if(!c)return;var idx=FLUXO_LINEAR.indexOf(c.statusFluxo);if(idx>=0&&idx<FLUXO_LINEAR.length-1){c.statusFluxo=FLUXO_LINEAR[idx+1];saveRecord('consulentes',c.id,consToDB(c));addHistDB(c.nomeCompleto+' \u2192 '+statusLabel(c.statusFluxo));toast('Avançado!');render()}};
+window.revertCons=function(id){var c=getCons(id);if(!c)return;var idx=FLUXO_LINEAR.indexOf(c.statusFluxo);if(idx>0){c.statusFluxo=FLUXO_LINEAR[idx-1];saveRecord('consulentes',c.id,consToDB(c));addHistDB(c.nomeCompleto+' \u2190 '+statusLabel(c.statusFluxo));toast('Voltou!');render()}};
 window.openConfirmConsulta=function(id){S.editConsulente=getCons(id);S.modal='confirmConsulta';render()};
 window.confirmDelConsulta=function(id){var c=getCons(id);if(!c)return;S.confirmText='<strong>Excluir consulta de '+esc(c.nomeCompleto)+'?</strong><br>Esta ação é irreversível.';S.confirmAction=async function(){await deleteRecord('consulentes',c.id);S.consulentes=S.consulentes.filter(function(x){return x.id!==id});addHistDB('- Consulta excluída: '+c.nomeCompleto);toast('Consulta excluída!','info');render()};S.modal='confirm';render()};
 window.concluirCicloConsulta=function(id){var c=getCons(id);if(!c)return;S.confirmText='<strong>Concluir ciclo de '+esc(c.nomeCompleto)+'?</strong><br>O consulente desistiu do processo.';S.confirmAction=async function(){c.statusFluxo='concluido';await saveRecord('consulentes',c.id,consToDB(c));addHistDB(c.nomeCompleto+' → Ciclo concluído');toast('Ciclo concluído!');render()};S.modal='confirm';render()};
@@ -1347,22 +1782,51 @@ window.openChangeConsPag=function(id){S.editConsulente=getCons(id);S.modal='chan
 window.doChangeConsPag=async function(){var c=S.editConsulente;if(!c)return;var ns=document.getElementById('mConsPagStatus').value;c.statusPagamento=ns;await saveRecord('consulentes',c.id,consToDB(c));addHistDB('Pagamento '+c.nomeCompleto+' → '+pagLabel(ns));toast('Pagamento atualizado!');closeModal();render()};
 
 window.salvarPrescricao=function(){var c=getCons(S.viewConsId);if(!c)return;c.oduResultado=document.getElementById('prOdu').value.trim();c.oduDescricao=document.getElementById('prOduDesc').value.trim();c.consideracoesGerais=document.getElementById('prConsGerais').value.trim();c.prescricaoRituais=document.getElementById('prRituais').value.trim();c.prescricaoMedicinas=document.getElementById('prMedicinas').value.trim();c.observacoesPrescricao=document.getElementById('prObs').value.trim();
-// Collect prescEbos from DOM
-var peArr=(S.prescEbos||[]).map(function(e,i){var t=document.getElementById('peTit'+i);var d=document.getElementById('peDesc'+i);var v=document.getElementById('peVal'+i);return {titulo:t?t.value.trim():(e.titulo||''),descricao:d?d.value.trim():(e.descricao||''),valor:v?(parseFloat(v.value)||0):(parseFloat(e.valor)||0)}}).filter(function(e){return e.titulo});
-c.prescricaoEbos=peArr;S.prescEbos=peArr.length?peArr:[{titulo:'',descricao:'',valor:0}];
-saveRecord('consulentes',c.id,consToDB(c));addHistDB('Prescrição: '+c.nomeCompleto+(peArr.length?' ('+peArr.length+' ebós)':''));toast('Salva!')};
+// Collect prescEbos from DOM and preserve existing granular state
+var existingEbos=normalizeItems(c.prescricaoEbos,'ebo');
+var peArr=(S.prescEbos||[]).map(function(e,i){var t=document.getElementById('peTit'+i);var d=document.getElementById('peDesc'+i);var v=document.getElementById('peVal'+i);var titulo=t?t.value.trim():(e.titulo||'');var descricao=d?d.value.trim():(e.descricao||'');var valor=v?(parseFloat(v.value)||0):(parseFloat(e.valor)||0);if(!titulo)return null;
+// Preserve existing state if id matches
+var existing=e.id?existingEbos.find(function(x){return x.id===e.id}):null;
+if(existing){existing.titulo=titulo;existing.descricao=descricao;existing.valor=valor;return existing}
+return normalizeItem({id:e.id,titulo:titulo,descricao:descricao,valor:valor},'ebo')}).filter(Boolean);
+// Collect prescMeds from DOM
+var existingMeds=normalizeItems(c.prescricaoMedicinasItens,'medicina');
+var pmArr=(S.prescMeds||[]).map(function(e,i){var t=document.getElementById('pmTit'+i);var d=document.getElementById('pmDesc'+i);var v=document.getElementById('pmVal'+i);var titulo=t?t.value.trim():(e.titulo||'');var descricao=d?d.value.trim():(e.descricao||'');var valor=v?(parseFloat(v.value)||0):(parseFloat(e.valor)||0);if(!titulo)return null;
+var existing=e.id?existingMeds.find(function(x){return x.id===e.id}):null;
+if(existing){existing.titulo=titulo;existing.descricao=descricao;existing.valor=valor;return existing}
+return normalizeItem({id:e.id,titulo:titulo,descricao:descricao,valor:valor},'medicina')}).filter(Boolean);
+c.prescricaoEbos=peArr;
+c.prescricaoMedicinasItens=pmArr;
+S.prescEbos=peArr.length?peArr:[normalizeItem({},'ebo')];
+S.prescMeds=pmArr.length?pmArr:[normalizeItem({},'medicina')];
+// Auto-transition: if prescription has items and status is still aguardando_prescricao, move to aguardando_decisao
+if((peArr.length||pmArr.length)&&c.statusFluxo==='aguardando_prescricao')c.statusFluxo='aguardando_decisao';
+saveRecord('consulentes',c.id,consToDB(c));
+addHistDB('Prescrição: '+c.nomeCompleto+(peArr.length?' ('+peArr.length+' ebós':'')+(pmArr.length?(peArr.length?', ':' (')+pmArr.length+' medicinas':'')+(peArr.length||pmArr.length?')':''));
+toast('Salva!')};
 
 window.addPrescEbo=function(){
 S.prescEbos=S.prescEbos||[];
-// Persist DOM values
 S.prescEbos.forEach(function(e,i){var t=document.getElementById('peTit'+i);if(t)e.titulo=t.value;var d=document.getElementById('peDesc'+i);if(d)e.descricao=d.value;var v=document.getElementById('peVal'+i);if(v)e.valor=parseFloat(v.value)||0});
-S.prescEbos.push({titulo:'',descricao:'',valor:0});render()};
+S.prescEbos.push(normalizeItem({},'ebo'));render()};
 
 window.removePrescEbo=function(i){
 if(!S.prescEbos)return;
 S.prescEbos.forEach(function(e,idx){var t=document.getElementById('peTit'+idx);if(t)e.titulo=t.value;var d=document.getElementById('peDesc'+idx);if(d)e.descricao=d.value;var v=document.getElementById('peVal'+idx);if(v)e.valor=parseFloat(v.value)||0});
 S.prescEbos.splice(i,1);
-if(!S.prescEbos.length)S.prescEbos=[{titulo:'',descricao:'',valor:0}];
+if(!S.prescEbos.length)S.prescEbos=[normalizeItem({},'ebo')];
+render()};
+
+window.addPrescMed=function(){
+S.prescMeds=S.prescMeds||[];
+S.prescMeds.forEach(function(e,i){var t=document.getElementById('pmTit'+i);if(t)e.titulo=t.value;var d=document.getElementById('pmDesc'+i);if(d)e.descricao=d.value;var v=document.getElementById('pmVal'+i);if(v)e.valor=parseFloat(v.value)||0});
+S.prescMeds.push(normalizeItem({},'medicina'));render()};
+
+window.removePrescMed=function(i){
+if(!S.prescMeds)return;
+S.prescMeds.forEach(function(e,idx){var t=document.getElementById('pmTit'+idx);if(t)e.titulo=t.value;var d=document.getElementById('pmDesc'+idx);if(d)e.descricao=d.value;var v=document.getElementById('pmVal'+idx);if(v)e.valor=parseFloat(v.value)||0});
+S.prescMeds.splice(i,1);
+if(!S.prescMeds.length)S.prescMeds=[normalizeItem({},'medicina')];
 render()};
 
 // Crediário
