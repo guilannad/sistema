@@ -140,6 +140,19 @@ tr:hover td{background:var(--accent-bg)}
 .tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;margin-right:4px}
 .tag-cliente_loja{background:#EBF5FB;color:#2471A3}.tag-consulente{background:#F4ECF7;color:#8E44AD}.tag-vip{background:#FEF9E7;color:#B7950B}
 .backup-section{background:var(--bg3);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow);margin-bottom:12px}
+.phone-group{display:flex;gap:6px}
+.phone-group select{flex:0 0 120px;padding:9px 8px;border:1.5px solid var(--border);border-radius:var(--radius);background:var(--bg);font-size:13px}
+.phone-group input{flex:1}
+.ebo-block{background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:10px;position:relative}
+.ebo-block .ebo-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.ebo-block .ebo-num{font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:1px}
+.ebo-block .ebo-remove{background:var(--danger);color:#fff;border:none;padding:3px 10px;border-radius:6px;font-size:12px;cursor:pointer}
+.ebo-block .ebo-remove:hover{background:#A93226}
+.ebo-total-bar{background:var(--accent-bg);border:1.5px solid var(--accent);border-radius:var(--radius);padding:10px 14px;margin:8px 0;font-size:14px;font-weight:600;color:var(--accent);display:flex;justify-content:space-between;align-items:center}
+.currency-prefix{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:13px;pointer-events:none;font-weight:600}
+.currency-wrap{position:relative}
+.currency-wrap input{padding-left:36px!important}
+.st-aguardando_ebo_ritual{background:#FDE8D0;color:#CA6F1E}
 @media print{body *{visibility:hidden}#eboSheet,#eboSheet *{visibility:visible}#eboSheet{position:fixed;top:0;left:0;width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;z-index:9999}#eboSheet .ebo-nome{font-size:72px;font-weight:700;text-align:center;margin-bottom:16px}#eboSheet .ebo-mae{font-size:36px;font-weight:700;text-align:center;margin-bottom:12px}#eboSheet .ebo-nasc{font-size:28px;font-weight:700;text-align:center;margin-bottom:12px}#eboSheet .ebo-local{font-size:24px;font-weight:700;text-align:center}@page{size:landscape;margin:1cm}}
 @media(max-width:600px){.header{flex-direction:column;gap:8px;text-align:center}.search-bar{flex-direction:column}.tab{padding:8px 10px;font-size:12px}.report-cards{grid-template-columns:1fr 1fr}.modal{padding:20px 16px}.bar-chart{height:160px}.kanban-grid{grid-template-columns:1fr}.form-group-row{grid-template-columns:1fr}.detail-grid{grid-template-columns:1fr}.quick-bar{justify-content:center}}
 </style>
@@ -154,7 +167,7 @@ var SECOES=["Escritório do Bàbá","Quarto dos Mestres","Armário da Cozinha","
 var TIPOS=["Caixa","Casca","Defumação","Erva","Fava","Folha","Fruto/Semente","Insumo","Item","Item/Magia","Líquido","Pedras","Pó","Raiz","Sabão","Semente","Voodoo"];
 var PERFIS=['admin','editor','viewer','secretario','babalawo','assistente'];
 var BAR_COLORS=["#CA6F1E","#5D4037","#6A1B9A","#2E7D32","#E65100","#388E3C","#F57F17","#00695C","#7D3C98","#AD1457","#2471A3","#5D6D7E","#8B6914","#4E342E","#1E8449","#558B2F","#212121"];
-var STATUS_FLUXO=[{key:'aguardando_consulta',label:'Aguardando Consulta',color:'#2471A3'},{key:'aguardando_prescricao',label:'Aguardando Prescrição',color:'#8B6914'},{key:'aguardando_ebo',label:'Aguardando Ebó',color:'#6A1B9A'},{key:'aguardando_medicina',label:'Aguardando Medicina',color:'#00695C'},{key:'concluido',label:'Concluído',color:'#1E8449'},{key:'cancelado',label:'Cancelado',color:'#C0392B'}];
+var STATUS_FLUXO=[{key:'aguardando_consulta',label:'Aguardando Consulta',color:'#2471A3'},{key:'aguardando_prescricao',label:'Aguardando Prescrição',color:'#8B6914'},{key:'aguardando_ebo',label:'Aguardando Ebó',color:'#6A1B9A'},{key:'ebo_em_andamento',label:'Ebó em Andamento',color:'#CA6F1E'},{key:'aguardando_medicina',label:'Aguardando Medicina',color:'#00695C'},{key:'concluido',label:'Concluído',color:'#1E8449'},{key:'cancelado',label:'Cancelado',color:'#C0392B'}];
 var STATUS_VENDA=[{key:'pedido_feito',label:'Pedido Feito',color:'#2471A3'},{key:'embalando',label:'Embalando',color:'#B7950B'},{key:'enviado',label:'Enviado',color:'#8E44AD'},{key:'concluido',label:'Concluído',color:'#1E8449'},{key:'cancelado',label:'Cancelado',color:'#C0392B'}];
 var STATUS_PAG=['pendente','50_pago','pago'];
 var ORIGENS=['instagram','tiktok','youtube','facebook','google','indicacao','loja_online','direto','whatsapp'];
@@ -174,16 +187,73 @@ function freteLabel(k){return{sedex:'Sedex',pac:'PAC',uber_envios:'Uber Envios',
 // ==================== STATE ====================
 var S={
 items:ITEMS_DATA.slice(),
-consulentes:[],pessoas:[],ciclos:[],interacoes:[],vendas:[],crediarios:[],livros:[],
+consulentes:[],pessoas:[],ciclos:[],interacoes:[],vendas:[],crediarios:[],livros:[],rituais:[],
 currentUser:null,activeTab:'dashboard',search:'',filterSecao:'',filterTipo:'',filterStatus:'',
 page:1,perPage:30,modal:null,editItem:null,editUser:null,editConsulente:null,
 filterGenero:'',filterTipoLivro:'',filterSecaoLivro:'',
-viewPessoaId:null,viewCicloId:null,viewConsId:null,viewVendaId:null,
+viewPessoaId:null,viewCicloId:null,viewConsId:null,viewVendaId:null,viewRitualId:null,
 history:[],toast:null,confirmText:'',confirmAction:null,notifications:[],
 flowType:null,flowPessoaId:null,changeCount:0,
 reportPeriod:'mensal',reportStart:'',reportEnd:'',
-vendaItems:[{nome:'',qtd:1,valorUnit:0}]
+vendaItems:[{nome:'',qtd:1,valorUnit:0}],
+ritualData:{titulo:'',descricao:'',valor:0,ebos:[{titulo:'',descricao:'',valor:0}]},
+prescEbos:[{titulo:'',descricao:'',valor:0}]
 };
+
+// ==================== COUNTRY CODES (for phone international) ====================
+var COUNTRY_CODES=[
+{code:'+55',name:'Brasil',flag:'🇧🇷'},
+{code:'+1',name:'EUA/Canadá',flag:'🇺🇸'},
+{code:'+44',name:'Reino Unido',flag:'🇬🇧'},
+{code:'+351',name:'Portugal',flag:'🇵🇹'},
+{code:'+34',name:'Espanha',flag:'🇪🇸'},
+{code:'+33',name:'França',flag:'🇫🇷'},
+{code:'+49',name:'Alemanha',flag:'🇩🇪'},
+{code:'+39',name:'Itália',flag:'🇮🇹'},
+{code:'+52',name:'México',flag:'🇲🇽'},
+{code:'+54',name:'Argentina',flag:'🇦🇷'},
+{code:'+56',name:'Chile',flag:'🇨🇱'},
+{code:'+57',name:'Colômbia',flag:'🇨🇴'},
+{code:'+58',name:'Venezuela',flag:'🇻🇪'},
+{code:'+51',name:'Peru',flag:'🇵🇪'},
+{code:'+598',name:'Uruguai',flag:'🇺🇾'},
+{code:'+595',name:'Paraguai',flag:'🇵🇾'},
+{code:'+591',name:'Bolívia',flag:'🇧🇴'},
+{code:'+593',name:'Equador',flag:'🇪🇨'},
+{code:'+81',name:'Japão',flag:'🇯🇵'},
+{code:'+86',name:'China',flag:'🇨🇳'},
+{code:'+91',name:'Índia',flag:'🇮🇳'},
+{code:'+61',name:'Austrália',flag:'🇦🇺'},
+{code:'+27',name:'África do Sul',flag:'🇿🇦'},
+{code:'+234',name:'Nigéria',flag:'🇳🇬'},
+{code:'+244',name:'Angola',flag:'🇦🇴'},
+{code:'+258',name:'Moçambique',flag:'🇲🇿'}
+];
+
+// ==================== PHONE HELPER ====================
+// Parses a stored telephone string into {code, number}. Defaults to +55 Brasil.
+function parsePhone(tel){
+if(!tel)return {code:'+55',number:''};
+tel=String(tel).trim();
+var m=tel.match(/^\+(\d{1,4})\s*(.*)$/);
+if(m){var c='+'+m[1];var found=COUNTRY_CODES.find(function(x){return x.code===c});if(found)return {code:c,number:m[2].trim()};return {code:c,number:m[2].trim()}}
+return {code:'+55',number:tel}
+}
+function formatPhone(code,num){if(!num||!String(num).trim())return '';return (code||'+55')+' '+String(num).trim()}
+// Builds an HTML phone input with country-code selector. ids: baseId+'Code', baseId+'Num'
+function phoneInput(baseId,value,placeholder){
+var p=parsePhone(value||'');
+var opts=COUNTRY_CODES.map(function(c){return '<option value="'+c.code+'"'+(p.code===c.code?' selected':'')+'>'+c.flag+' '+c.code+'</option>'}).join('');
+return '<div class="phone-group"><select id="'+baseId+'Code">'+opts+'</select><input type="tel" id="'+baseId+'Num" value="'+esc(p.number)+'" placeholder="'+esc(placeholder||'Número')+'" inputmode="tel"></div>'
+}
+// Reads phone value from composite input
+function readPhone(baseId){var c=document.getElementById(baseId+'Code');var n=document.getElementById(baseId+'Num');if(!n)return '';var num=n.value.trim();if(!num)return '';return formatPhone(c?c.value:'+55',num)}
+
+// ==================== CURRENCY HELPER ====================
+function currencyInput(id,value,placeholder,onchange){
+var v=value!==undefined&&value!==null&&value!==''?parseFloat(value).toFixed(2):'';
+return '<div class="currency-wrap"><span class="currency-prefix">R$</span><input type="number" step="0.01" min="0" id="'+id+'" value="'+v+'" placeholder="'+(placeholder||'0,00')+'"'+(onchange?' onchange="'+onchange+'"':'')+' inputmode="decimal"></div>'
+}
 
 // ==================== SUPABASE CONFIG (Fase 2 - Auth + RLS) ====================
 var SUPABASE_URL='https://pbizmuonubskyfwzxwhn.supabase.co';
@@ -274,8 +344,8 @@ return null}
 // Map JS camelCase to DB snake_case
 function pessoaToDB(p){return {id:p.id||undefined,nome:p.nome,nome_mae:p.nomeMae||'',telefone:p.telefone||'',email:p.email||'',data_nascimento:p.dataNascimento||null,origem:p.origem||'',observacoes:p.observacoes||'',foto:p.foto||'',logradouro:p.logradouro||'',numero:p.numero||'',complemento:p.complemento||'',bairro:p.bairro||'',cidade:p.cidade||'',estado:p.estado||'',cep:p.cep||'',pais:p.pais||'Brasil'}}
 function pessoaFromDB(r){return {id:r.id,nome:r.nome,nomeMae:r.nome_mae||'',telefone:r.telefone||'',email:r.email||'',dataNascimento:r.data_nascimento||'',origem:r.origem||'',observacoes:r.observacoes||'',foto:r.foto||'',logradouro:r.logradouro||'',numero:r.numero||'',complemento:r.complemento||'',bairro:r.bairro||'',cidade:r.cidade||'',estado:r.estado||'',cep:r.cep||'',pais:r.pais||'Brasil',dataCriacao:r.created_at?r.created_at.slice(0,10):today()}}
-function consToDB(c){return {id:c.id||undefined,pessoa_id:c.pessoaId||null,nome_completo:c.nomeCompleto,nome_mae:c.nomeMae||'',data_nascimento:c.dataNascimento||null,telefone_whatsapp:c.telefoneWhatsApp||'',data_consulta:c.dataConsulta||null,horario_consulta:c.horarioConsulta||'',formato_consulta:c.formatoConsulta||'',origem:c.origem||'',tipo_consulta:c.tipoConsulta||'normal',forma_pagamento:c.formaPagamento||'',valor_cobrado:c.valorCobrado||0,valor_recebido:c.valorRecebido||0,status_pagamento:c.statusPagamento||'pendente',status_fluxo:c.statusFluxo||'aguardando_consulta',logradouro:c.logradouro||'',numero:c.numero||'',complemento:c.complemento||'',bairro:c.bairro||'',cidade:c.cidade||'',estado:c.estado||'',cep:c.cep||'',pais:c.pais||'Brasil',odu_resultado:c.oduResultado||'',odu_descricao:c.oduDescricao||'',consideracoes_gerais:c.consideracoesGerais||'',prescricao_rituais:c.prescricaoRituais||'',prescricao_medicinas:c.prescricaoMedicinas||'',observacoes_prescricao:c.observacoesPrescricao||'',comprovante:c.comprovante||''}}
-function consFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,nomeCompleto:r.nome_completo,nomeMae:r.nome_mae||'',dataNascimento:r.data_nascimento||'',telefoneWhatsApp:r.telefone_whatsapp||'',dataConsulta:r.data_consulta||'',horarioConsulta:r.horario_consulta||'',formatoConsulta:r.formato_consulta||'',origem:r.origem||'',tipoConsulta:r.tipo_consulta||'normal',formaPagamento:r.forma_pagamento||'',valorCobrado:r.valor_cobrado||0,valorRecebido:r.valor_recebido||0,statusPagamento:r.status_pagamento||'pendente',statusFluxo:r.status_fluxo||'aguardando_consulta',logradouro:r.logradouro||'',numero:r.numero||'',complemento:r.complemento||'',bairro:r.bairro||'',cidade:r.cidade||'',estado:r.estado||'',cep:r.cep||'',pais:r.pais||'Brasil',oduResultado:r.odu_resultado||'',oduDescricao:r.odu_descricao||'',consideracoesGerais:r.consideracoes_gerais||'',prescricaoRituais:r.prescricao_rituais||'',prescricaoMedicinas:r.prescricao_medicinas||'',observacoesPrescricao:r.observacoes_prescricao||'',comprovante:r.comprovante||''}}
+function consToDB(c){return {id:c.id||undefined,pessoa_id:c.pessoaId||null,nome_completo:c.nomeCompleto,nome_mae:c.nomeMae||'',data_nascimento:c.dataNascimento||null,telefone_whatsapp:c.telefoneWhatsApp||'',data_consulta:c.dataConsulta||null,horario_consulta:c.horarioConsulta||'',formato_consulta:c.formatoConsulta||'',origem:c.origem||'',tipo_consulta:c.tipoConsulta||'normal',forma_pagamento:c.formaPagamento||'',valor_cobrado:c.valorCobrado||0,valor_recebido:c.valorRecebido||0,status_pagamento:c.statusPagamento||'pendente',status_fluxo:c.statusFluxo||'aguardando_consulta',logradouro:c.logradouro||'',numero:c.numero||'',complemento:c.complemento||'',bairro:c.bairro||'',cidade:c.cidade||'',estado:c.estado||'',cep:c.cep||'',pais:c.pais||'Brasil',odu_resultado:c.oduResultado||'',odu_descricao:c.oduDescricao||'',consideracoes_gerais:c.consideracoesGerais||'',prescricao_rituais:c.prescricaoRituais||'',prescricao_medicinas:c.prescricaoMedicinas||'',observacoes_prescricao:c.observacoesPrescricao||'',prescricao_ebos:c.prescricaoEbos||[],comprovante:c.comprovante||''}}
+function consFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,nomeCompleto:r.nome_completo,nomeMae:r.nome_mae||'',dataNascimento:r.data_nascimento||'',telefoneWhatsApp:r.telefone_whatsapp||'',dataConsulta:r.data_consulta||'',horarioConsulta:r.horario_consulta||'',formatoConsulta:r.formato_consulta||'',origem:r.origem||'',tipoConsulta:r.tipo_consulta||'normal',formaPagamento:r.forma_pagamento||'',valorCobrado:r.valor_cobrado||0,valorRecebido:r.valor_recebido||0,statusPagamento:r.status_pagamento||'pendente',statusFluxo:r.status_fluxo||'aguardando_consulta',logradouro:r.logradouro||'',numero:r.numero||'',complemento:r.complemento||'',bairro:r.bairro||'',cidade:r.cidade||'',estado:r.estado||'',cep:r.cep||'',pais:r.pais||'Brasil',oduResultado:r.odu_resultado||'',oduDescricao:r.odu_descricao||'',consideracoesGerais:r.consideracoes_gerais||'',prescricaoRituais:r.prescricao_rituais||'',prescricaoMedicinas:r.prescricao_medicinas||'',observacoesPrescricao:r.observacoes_prescricao||'',prescricaoEbos:r.prescricao_ebos||[],comprovante:r.comprovante||''}}
 function vendaToDB(v){return {id:v.id||undefined,pessoa_id:v.pessoaId||null,data:v.data||today(),itens:v.itens||[],subtotal:v.subtotal||0,valor_frete:v.valorFrete||0,total_com_frete:v.totalComFrete||0,tipo_frete:v.tipoFrete||'',forma_pagamento:v.formaPagamento||'',status:v.status||'pedido_feito',codigo_rastreio:v.codigoRastreio||'',comprovante:v.comprovante||''}}
 function vendaFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,data:r.data||'',itens:r.itens||[],subtotal:r.subtotal||0,valorFrete:r.valor_frete||0,totalComFrete:r.total_com_frete||0,tipoFrete:r.tipo_frete||'',formaPagamento:r.forma_pagamento||'',status:r.status||'pedido_feito',codigoRastreio:r.codigo_rastreio||'',comprovante:r.comprovante||''}}
 function cicloToDB(c){return {id:c.id||undefined,pessoa_id:c.pessoaId||null,tipo:c.tipo||'',data_inicio:c.dataInicio||today(),data_fim:c.dataFim||null,status:c.status||'ativo',observacoes:c.observacoes||''}}
@@ -284,6 +354,8 @@ function interToDB(i){return {id:i.id||undefined,ciclo_id:i.cicloId||null,tipo:i
 function interFromDB(r){return {id:r.id,cicloId:r.ciclo_id,tipo:r.tipo||'',data:r.data||'',descricao:r.descricao||'',valor:r.valor||'',formaPagamento:r.forma_pagamento||'',status:r.status||'',criadoPor:r.criado_por||''}}
 function credToDB(c){return {id:c.id||undefined,pessoa_id:c.pessoaId||null,descricao:c.descricao||'',valor_total:c.valorTotal||0,data:c.data||today(),pagamentos:c.pagamentos||[]}}
 function credFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,descricao:r.descricao||'',valorTotal:r.valor_total||0,data:r.data||'',pagamentos:r.pagamentos||[]}}
+function ritualToDB(r){return {id:r.id||undefined,pessoa_id:r.pessoaId||null,consulente_id:r.consulenteId||null,titulo:r.titulo||'',descricao:r.descricao||'',valor:r.valor||0,ebos:r.ebos||[],data:r.data||today(),status:r.status||'em_andamento',origem:r.origem||'avulso',observacoes:r.observacoes||''}}
+function ritualFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,consulenteId:r.consulente_id||null,titulo:r.titulo||'',descricao:r.descricao||'',valor:parseFloat(r.valor)||0,ebos:r.ebos||[],data:r.data||'',status:r.status||'em_andamento',origem:r.origem||'avulso',observacoes:r.observacoes||''}}
 
 // Debounced save for a specific table
 // Save individual record - direct PATCH, no debounce
@@ -395,6 +467,7 @@ try{
     {key:'ciclos', map:cicloFromDB},
     {key:'interacoes', map:interFromDB},
     {key:'crediarios', map:credFromDB},
+    {key:'rituais', map:ritualFromDB},
     {key:'livros', map:null}
   ];
 
@@ -772,7 +845,7 @@ function renderHeader(){
   '</div>';
 }
 
-function renderQuickBar(){return '<div class="quick-bar"><span style="font-size:13px;color:var(--text3);font-weight:500">Ações:</span>'+(hasRole(['admin','secretario','editor','babalawo','assistente'])?'<button class="btn btn-sm btn-success" onclick="startFlow(\'venda\')">+ Venda</button>':'')+(hasRole(['admin','secretario','babalawo'])?'<button class="btn btn-sm btn-purple" onclick="startFlow(\'consulta\')">+ Consulta</button>':'')+'<button class="btn btn-sm btn-info" onclick="startFlow(\'buscar\')">Buscar Cliente</button></div>'}
+function renderQuickBar(){return '<div class="quick-bar"><span style="font-size:13px;color:var(--text3);font-weight:500">Ações:</span>'+(hasRole(['admin','secretario','editor','babalawo','assistente'])?'<button class="btn btn-sm btn-success" onclick="startFlow(\'venda\')">+ Venda</button>':'')+(hasRole(['admin','secretario','babalawo'])?'<button class="btn btn-sm btn-purple" onclick="startFlow(\'consulta\')">+ Consulta</button>':'')+(hasRole(['admin','secretario','babalawo'])?'<button class="btn btn-sm btn-warning" onclick="startFlow(\'ritual\')">+ Ritual</button>':'')+'<button class="btn btn-sm btn-info" onclick="startFlow(\'buscar\')">Buscar Cliente</button></div>'}
 
 function renderTabs(){var tabs=[{key:'dashboard',label:'Dashboard'}];
 if(hasRole(['admin','editor','viewer']))tabs.push({key:'busca',label:'Busca'});
@@ -793,7 +866,7 @@ var bs={};STATUS_FLUXO.forEach(function(s){bs[s.key]=[]});S.consulentes.forEach(
 var alerts=getPrescAlerts();var pendingOrders=S.vendas.filter(function(v){return v.status!=='concluido'&&v.status!=='cancelado'});
 var delAlerts=S.notifications.filter(function(n){return n.tipo==='alerta_exclusao'});
 var h='<div class="report-cards"><div class="report-card"><div class="rc-label">Consulentes</div><div class="rc-value">'+S.consulentes.length+'</div></div><div class="report-card"><div class="rc-label">Clientes</div><div class="rc-value">'+S.pessoas.length+'</div></div><div class="report-card" style="border-left-color:var(--warning)"><div class="rc-label">Pedidos Ativos</div><div class="rc-value">'+pendingOrders.length+'</div></div>';
-STATUS_FLUXO.slice(0,4).forEach(function(s){h+='<div class="report-card" style="border-left-color:'+s.color+'"><div class="rc-label">'+s.label+'</div><div class="rc-value">'+bs[s.key].length+'</div></div>'});
+STATUS_FLUXO.slice(0,5).forEach(function(s){var cnt=bs[s.key].length;if(s.key==='ebo_em_andamento')cnt+=S.rituais.filter(function(r){return r.status==='em_andamento'}).length;h+='<div class="report-card" style="border-left-color:'+s.color+'"><div class="rc-label">'+s.label+'</div><div class="rc-value">'+cnt+'</div></div>'});
 h+='</div>';
 // Alerts section - only for admin, babalawo, secretario
 if(hasRole(['admin','babalawo','secretario'])){
@@ -802,7 +875,10 @@ if(alerts.length){h+='<div class="chart-container" style="border-left:4px solid 
 if(S.notifications.length){h+='<div class="chart-container"><div class="chart-title">Notificações Recentes</div>';S.notifications.slice(0,5).forEach(function(n){h+='<div style="padding:4px 10px;margin-bottom:3px;font-size:12px;color:var(--text2)">'+esc(n.tipo)+': '+esc(n.nome)+' \u2022 '+esc(n.time)+'</div>'});h+='</div>'}
 }
 // Kanban
-var k='<div class="kanban-grid">';STATUS_FLUXO.forEach(function(s){k+='<div class="kanban-col"><div class="kanban-header">'+esc(s.label)+'<span class="kanban-count">'+bs[s.key].length+'</span></div>';bs[s.key].forEach(function(c){var pd=0;if(c.statusFluxo==='aguardando_prescricao'&&c.dataConsulta)pd=daysDiff(c.dataConsulta,today());k+='<div class="kanban-card" style="border-left-color:'+s.color+'"><h4>'+esc(c.nomeCompleto)+'</h4><div class="kc-sub">'+fmtDate(c.dataConsulta)+' <span class="pag-badge pag-'+c.statusPagamento+'">'+pagLabel(c.statusPagamento)+'</span></div>';if(pd>=3)k+='<div style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--danger-bg);color:var(--danger);margin-bottom:4px">'+pd+'d sem prescrição</div>';k+='<div class="kc-actions">';var idx=STATUS_FLUXO.findIndex(function(x){return x.key===s.key});if(idx>0&&s.key!=='cancelado')k+='<button class="btn btn-sm btn-outline" onclick="revertCons('+c.id+')">\u25C0</button>';if(idx<4&&s.key!=='concluido'&&s.key!=='cancelado')k+='<button class="btn btn-sm btn-success" onclick="advanceCons('+c.id+')">Avançar</button>';if(s.key==='aguardando_consulta'){k+='<button class="btn btn-sm btn-info" onclick="openConfirmConsulta('+c.id+')">Confirmar</button>';k+='<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="confirmDelConsulta('+c.id+')">Excluir</button>';k+='<button class="btn btn-sm btn-outline" style="color:var(--warning);border-color:var(--warning)" onclick="concluirCicloConsulta('+c.id+')">Concluir Ciclo</button>'}if(s.key==='aguardando_prescricao')k+='<button class="btn btn-sm btn-warning" onclick="goPrescrPage('+c.id+')">Prescrição</button>';if(s.key==='aguardando_ebo'){k+='<button class="btn btn-sm btn-warning" onclick="goPrescrPage('+c.id+')">Prescrição</button>';k+='<button class="btn btn-sm btn-info" onclick="gerarEbo(getCons('+c.id+'))">Ebó</button>'}k+='<button class="btn btn-sm btn-outline" onclick="openChangeConsPag('+c.id+')">Pag.</button><button class="btn btn-sm btn-outline" onclick="openViewCons('+c.id+')">Ver</button></div></div>'});k+='</div>'});k+='</div>';
+var k='<div class="kanban-grid">';STATUS_FLUXO.forEach(function(s){var colCount=bs[s.key].length;var ritCol=[];if(s.key==='ebo_em_andamento'){ritCol=S.rituais.filter(function(r){return r.status==='em_andamento'});colCount+=ritCol.length}k+='<div class="kanban-col"><div class="kanban-header">'+esc(s.label)+'<span class="kanban-count">'+colCount+'</span></div>';bs[s.key].forEach(function(c){var pd=0;if(c.statusFluxo==='aguardando_prescricao'&&c.dataConsulta)pd=daysDiff(c.dataConsulta,today());k+='<div class="kanban-card" style="border-left-color:'+s.color+'"><h4>'+esc(c.nomeCompleto)+'</h4><div class="kc-sub">'+fmtDate(c.dataConsulta)+' <span class="pag-badge pag-'+c.statusPagamento+'">'+pagLabel(c.statusPagamento)+'</span></div>';if(pd>=3)k+='<div style="font-size:11px;padding:2px 6px;border-radius:4px;background:var(--danger-bg);color:var(--danger);margin-bottom:4px">'+pd+'d sem prescrição</div>';k+='<div class="kc-actions">';var idx=STATUS_FLUXO.findIndex(function(x){return x.key===s.key});if(idx>0&&s.key!=='cancelado')k+='<button class="btn btn-sm btn-outline" onclick="revertCons('+c.id+')">\u25C0</button>';if(idx<5&&s.key!=='concluido'&&s.key!=='cancelado')k+='<button class="btn btn-sm btn-success" onclick="advanceCons('+c.id+')">Avançar</button>';if(s.key==='aguardando_consulta'){k+='<button class="btn btn-sm btn-info" onclick="openConfirmConsulta('+c.id+')">Confirmar</button>';k+='<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="confirmDelConsulta('+c.id+')">Excluir</button>';k+='<button class="btn btn-sm btn-outline" style="color:var(--warning);border-color:var(--warning)" onclick="concluirCicloConsulta('+c.id+')">Concluir Ciclo</button>'}if(s.key==='aguardando_prescricao')k+='<button class="btn btn-sm btn-warning" onclick="goPrescrPage('+c.id+')">Prescrição</button>';if(s.key==='aguardando_ebo'){k+='<button class="btn btn-sm btn-warning" onclick="goPrescrPage('+c.id+')">Prescrição</button>';k+='<button class="btn btn-sm btn-info" onclick="gerarEbo(getCons('+c.id+'))">Ebó</button>'}k+='<button class="btn btn-sm btn-outline" onclick="openChangeConsPag('+c.id+')">Pag.</button><button class="btn btn-sm btn-outline" onclick="openViewCons('+c.id+')">Ver</button></div></div>'});
+// Ritual cards in ebo_em_andamento column
+if(s.key==='ebo_em_andamento'){ritCol.forEach(function(r){var pe=getPessoa(r.pessoaId);var nome=pe?pe.nome:'?';var neb=(r.ebos||[]).length;var tot=(parseFloat(r.valor)||0);(r.ebos||[]).forEach(function(e){tot+=parseFloat(e.valor)||0});k+='<div class="kanban-card" style="border-left-color:'+s.color+'"><h4>\u2728 '+esc(r.titulo)+'</h4><div class="kc-sub">'+esc(nome)+' \u2022 '+neb+' ebó(s) \u2022 R$'+tot.toFixed(2).replace('.',',')+'</div><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Ritual avulso • '+fmtDate(r.data)+'</div><div class="kc-actions"><button class="btn btn-sm btn-success" onclick="advanceRitual('+r.id+')">Concluir</button>'+(pe?'<button class="btn btn-sm btn-outline" onclick="goPerfil('+pe.id+')">Ver</button>':'')+'<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="confirmDelRitual('+r.id+')">Excluir</button></div></div>'})}
+k+='</div>'});k+='</div>';
 return h+k}
 
 // === DASHBOARD VENDAS ===
@@ -847,6 +923,10 @@ return stats+'<div class="search-section"><div class="search-bar"><input class="
 function renderPrescricaoPage(){
 var c=getCons(S.viewConsId);if(!c)return '<div class="empty-state">Não encontrado</div>';
 var p=c.pessoaId?getPessoa(c.pessoaId):null;
+// Initialize prescEbos from consulente on first render
+if(!S._prescInitFor||S._prescInitFor!==c.id){
+S.prescEbos=(c.prescricaoEbos&&c.prescricaoEbos.length)?JSON.parse(JSON.stringify(c.prescricaoEbos)):[{titulo:'',descricao:'',valor:0}];
+S._prescInitFor=c.id}
 var h='<div style="margin-bottom:8px"><button class="btn btn-sm btn-outline" onclick="setTab(\'dashboard\')">\u2190 Voltar</button></div>';
 h+='<div class="profile-card"><h3 style="font-family:Playfair Display,serif;color:var(--accent)">Prescrição \u2014 '+esc(c.nomeCompleto)+'</h3><div class="profile-sub" style="margin-bottom:16px">'+fmtDate(c.dataConsulta)+' '+esc(c.horarioConsulta||'')+' \u2022 Mãe: '+esc(c.nomeMae||'\u2014')+' \u2022 <span class="status-badge st-'+c.statusFluxo+'">'+statusLabel(c.statusFluxo)+'</span></div>';
 h+='<div style="text-align:center;margin-bottom:16px"><div style="font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Resultado Direto da Consulta</div><input id="prOdu" value="'+esc(c.oduResultado||'')+'" placeholder="Ex: Odù Opole: Osa Ika..." style="width:100%;max-width:500px;padding:12px;border:1.5px solid var(--border);border-radius:20px;font-size:15px;text-align:center;background:var(--bg)"></div>';
@@ -857,6 +937,19 @@ var ids=['prConsGerais','prRituais','prMedicinas','prObs'];
 var vals=[c.consideracoesGerais||'',c.prescricaoRituais||'',c.prescricaoMedicinas||'',c.observacoesPrescricao||''];
 h+='<div style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:16px"><div style="font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">'+title+'</div><textarea id="'+ids[i]+'" rows="10" style="width:100%;border:1px solid var(--border2);border-radius:var(--radius);padding:10px;font-size:13px;line-height:1.6;resize:vertical;font-family:inherit">'+esc(vals[i])+'</textarea></div>'});
 h+='</div>';
+// ====== RITUALIDADES SECTION ======
+var pe=S.prescEbos||[];
+var ebosTotal=0;pe.forEach(function(e){ebosTotal+=parseFloat(e.valor)||0});
+h+='<fieldset style="border:1.5px solid var(--purple);border-radius:var(--radius-lg);padding:16px;margin-top:20px;background:var(--purple-bg)"><legend style="font-size:13px;font-weight:700;padding:0 8px;color:var(--purple);text-transform:uppercase;letter-spacing:1px">Ritualidades (Ebós) — '+pe.length+'</legend>';
+h+='<div style="font-size:12px;color:var(--text2);margin-bottom:10px">Ebós prescritos a partir desta consulta. Serão contados no sistema.</div>';
+pe.forEach(function(e,i){
+h+='<div class="ebo-block"><div class="ebo-header"><span class="ebo-num">Ebó #'+(i+1)+'</span>'+((pe.length>1)?'<button type="button" class="ebo-remove" onclick="removePrescEbo('+i+')">Remover</button>':'')+'</div>'+
+'<div class="form-group"><label>Título</label><input id="peTit'+i+'" value="'+esc(e.titulo||'')+'" onchange="S.prescEbos['+i+'].titulo=this.value" placeholder="Ex: Ebó para Esu"></div>'+
+'<div class="form-group"><label>Descrição</label><textarea id="peDesc'+i+'" rows="2" onchange="S.prescEbos['+i+'].descricao=this.value" placeholder="Detalhes...">'+esc(e.descricao||'')+'</textarea></div>'+
+'<div class="form-group"><label>Valor</label>'+currencyInput('peVal'+i,e.valor,'0,00','S.prescEbos['+i+'].valor=parseFloat(this.value)||0;render()')+'</div>'+
+'</div>'});
+h+='<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:8px"><button type="button" class="btn btn-sm btn-purple" onclick="addPrescEbo()">+ Adicionar Ebó</button><div style="font-weight:700;color:var(--purple)">Total Ebós: R$ '+ebosTotal.toFixed(2).replace('.',',')+'</div></div>';
+h+='</fieldset>';
 h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:20px;justify-content:center"><button class="btn btn-primary" onclick="salvarPrescricao()">Salvar</button><button class="btn btn-info" onclick="salvarPrescricao();gerarPrescricaoPDF(getCons('+c.id+'))">Gerar PDF</button><button class="btn btn-success" onclick="salvarPrescricao();advanceCons('+c.id+')">Salvar e Avançar</button></div></div>';
 return h}
 
@@ -882,7 +975,13 @@ return h}
 function renderDetalheCiclo(){var c=getCiclo(S.viewCicloId);if(!c)return '';var p=getPessoa(c.pessoaId);var ints=getIntersCiclo(c.id);var h='<div style="margin-bottom:8px"><button class="btn btn-sm btn-outline" onclick="goPerfil('+c.pessoaId+')">\u2190</button></div><div class="profile-card"><div class="profile-name">Ciclo #'+c.id+'</div></div>';h+='<div class="timeline">';ints.forEach(function(it){h+='<div class="tl-item"><span style="font-size:12px;font-weight:600;color:var(--accent)">'+interLabel(it.tipo)+'</span> <span style="font-size:11px;color:var(--text3)">'+fmtDate(it.data)+'</span>'+(it.valor?' <span style="color:var(--success);font-weight:600">R$'+esc(it.valor)+'</span>':'')+'<div style="font-size:13px;margin-top:4px">'+esc(it.descricao||'')+'</div></div>'});h+='</div>';return h}
 
 function renderNotificacoes(){var alerts=getPrescAlerts();var h='<div style="margin-bottom:12px"><button class="btn btn-primary" onclick="checkAlerts();toast(\'OK!\')">Verificar</button></div>';if(alerts.length){h+='<div class="chart-container"><div class="chart-title">Prescrições Pendentes</div>';alerts.forEach(function(a){h+='<div style="padding:6px;margin-bottom:4px;border-radius:6px;background:var(--warning-bg)">'+esc(a.consulente.nomeCompleto)+' - '+a.dias+'d</div>'});h+='</div>'}if(!S.notifications.length)h+='<div class="empty-state">Nenhuma</div>';else h+='<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Tipo</th><th>Nome</th><th>Hora</th></tr></thead><tbody>'+S.notifications.slice(0,30).map(function(n){return '<tr><td>'+esc(n.tipo)+'</td><td>'+esc(n.nome)+'</td><td style="font-size:12px">'+esc(n.time)+'</td></tr>'}).join('')+'</tbody></table></div></div>';return h}
-function renderRelVendas(){var now=new Date();var start=new Date(now-30*864e5).toISOString().slice(0,10),end=today();if(S.reportPeriod==='semanal')start=new Date(now-7*864e5).toISOString().slice(0,10);else if(S.reportPeriod==='trimestral')start=new Date(now-90*864e5).toISOString().slice(0,10);else if(S.reportPeriod==='semestral')start=new Date(now-180*864e5).toISOString().slice(0,10);var vendas=S.vendas.filter(function(v){return v.data>=start&&v.data<=end});var tv=0;vendas.forEach(function(v){tv+=(v.totalComFrete||0)});var consC=S.consulentes.filter(function(c){return c.statusFluxo!=='aguardando_consulta'&&c.statusFluxo!=='cancelado'});var consP=consC.filter(function(c){return c.dataConsulta>=start&&c.dataConsulta<=end});var cNo=consP.filter(function(c){return (c.tipoConsulta||'normal')==='normal'});var cUr=consP.filter(function(c){return c.tipoConsulta==='urgencia'});var tcC=0,tcR=0;consP.forEach(function(c){tcC+=(c.valorCobrado||0);tcR+=(c.valorRecebido||0)});var cnC=0,cnR=0;cNo.forEach(function(c){cnC+=(c.valorCobrado||0);cnR+=(c.valorRecebido||0)});var cuC=0,cuR=0;cUr.forEach(function(c){cuC+=(c.valorCobrado||0);cuR+=(c.valorRecebido||0)});var tG=tv+tcR;return '<div class="search-section"><div class="filters"><select onchange="S.reportPeriod=this.value;render()"><option value="semanal"'+(S.reportPeriod==='semanal'?' selected':'')+'>Semanal</option><option value="mensal"'+(S.reportPeriod==='mensal'?' selected':'')+'>Mensal</option><option value="trimestral"'+(S.reportPeriod==='trimestral'?' selected':'')+'>Trimestral</option><option value="semestral"'+(S.reportPeriod==='semestral'?' selected':'')+'>Semestral</option></select></div></div><div class="report-cards"><div class="report-card" style="border-left-color:var(--success)"><div class="rc-label">Vendas</div><div class="rc-value">'+vendas.length+'</div><div class="rc-sub">R$'+tv.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:var(--info)"><div class="rc-label">Consultas Normal</div><div class="rc-value">'+cNo.length+'</div></div><div class="report-card" style="border-left-color:var(--danger)"><div class="rc-label">Consultas Urgência</div><div class="rc-value">'+cUr.length+'</div></div><div class="report-card" style="border-left-color:var(--purple)"><div class="rc-label">Receita Consultas</div><div class="rc-value">R$'+tcR.toFixed(0)+'</div><div class="rc-sub">Cobrado: R$'+tcC.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:var(--accent)"><div class="rc-label">Total Geral</div><div class="rc-value">R$'+tG.toFixed(0)+'</div><div class="rc-sub">Vendas + Consultas</div></div></div><div class="chart-container"><div class="chart-title">Consultas no Período</div><div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Tipo</th><th>Qtd</th><th>Cobrado</th><th>Recebido</th></tr></thead><tbody><tr><td>Normal</td><td>'+cNo.length+'</td><td>R$'+cnC.toFixed(2)+'</td><td>R$'+cnR.toFixed(2)+'</td></tr><tr><td>Urgência</td><td>'+cUr.length+'</td><td>R$'+cuC.toFixed(2)+'</td><td>R$'+cuR.toFixed(2)+'</td></tr><tr style="font-weight:700;background:var(--accent-bg)"><td>TOTAL</td><td>'+consP.length+'</td><td>R$'+tcC.toFixed(2)+'</td><td>R$'+tcR.toFixed(2)+'</td></tr></tbody></table></div></div></div>'}
+function renderRelVendas(){var now=new Date();var start=new Date(now-30*864e5).toISOString().slice(0,10),end=today();if(S.reportPeriod==='semanal')start=new Date(now-7*864e5).toISOString().slice(0,10);else if(S.reportPeriod==='trimestral')start=new Date(now-90*864e5).toISOString().slice(0,10);else if(S.reportPeriod==='semestral')start=new Date(now-180*864e5).toISOString().slice(0,10);var vendas=S.vendas.filter(function(v){return v.data>=start&&v.data<=end});var tv=0;vendas.forEach(function(v){tv+=(v.totalComFrete||0)});var consC=S.consulentes.filter(function(c){return c.statusFluxo!=='aguardando_consulta'&&c.statusFluxo!=='cancelado'});var consP=consC.filter(function(c){return c.dataConsulta>=start&&c.dataConsulta<=end});var cNo=consP.filter(function(c){return (c.tipoConsulta||'normal')==='normal'});var cUr=consP.filter(function(c){return c.tipoConsulta==='urgencia'});var tcC=0,tcR=0;consP.forEach(function(c){tcC+=(c.valorCobrado||0);tcR+=(c.valorRecebido||0)});var cnC=0,cnR=0;cNo.forEach(function(c){cnC+=(c.valorCobrado||0);cnR+=(c.valorRecebido||0)});var cuC=0,cuR=0;cUr.forEach(function(c){cuC+=(c.valorCobrado||0);cuR+=(c.valorRecebido||0)});
+// Ebós/Rituais
+var ritP=S.rituais.filter(function(r){return r.data>=start&&r.data<=end});var nEbRit=0,vEbRit=0;ritP.forEach(function(r){nEbRit+=(r.ebos||[]).length;vEbRit+=parseFloat(r.valor)||0;(r.ebos||[]).forEach(function(e){vEbRit+=parseFloat(e.valor)||0})});
+var nEbPresc=0,vEbPresc=0;S.consulentes.forEach(function(c){if(c.dataConsulta>=start&&c.dataConsulta<=end&&Array.isArray(c.prescricaoEbos)){nEbPresc+=c.prescricaoEbos.length;c.prescricaoEbos.forEach(function(e){vEbPresc+=parseFloat(e.valor)||0})}});
+var nEbTot=nEbRit+nEbPresc;var vEbTot=vEbRit+vEbPresc;
+var tG=tv+tcR+vEbRit;
+return '<div class="search-section"><div class="filters"><select onchange="S.reportPeriod=this.value;render()"><option value="semanal"'+(S.reportPeriod==='semanal'?' selected':'')+'>Semanal</option><option value="mensal"'+(S.reportPeriod==='mensal'?' selected':'')+'>Mensal</option><option value="trimestral"'+(S.reportPeriod==='trimestral'?' selected':'')+'>Trimestral</option><option value="semestral"'+(S.reportPeriod==='semestral'?' selected':'')+'>Semestral</option></select></div></div><div class="report-cards"><div class="report-card" style="border-left-color:var(--success)"><div class="rc-label">Vendas</div><div class="rc-value">'+vendas.length+'</div><div class="rc-sub">R$'+tv.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:var(--info)"><div class="rc-label">Consultas Normal</div><div class="rc-value">'+cNo.length+'</div></div><div class="report-card" style="border-left-color:var(--danger)"><div class="rc-label">Consultas Urgência</div><div class="rc-value">'+cUr.length+'</div></div><div class="report-card" style="border-left-color:#CA6F1E"><div class="rc-label">Rituais Avulsos</div><div class="rc-value">'+ritP.length+'</div><div class="rc-sub">R$'+vEbRit.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:var(--purple)"><div class="rc-label">Ebós (Total)</div><div class="rc-value">'+nEbTot+'</div><div class="rc-sub">Avulsos: '+nEbRit+' + Prescritos: '+nEbPresc+' • R$'+vEbTot.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:var(--purple)"><div class="rc-label">Receita Consultas</div><div class="rc-value">R$'+tcR.toFixed(0)+'</div><div class="rc-sub">Cobrado: R$'+tcC.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:var(--accent)"><div class="rc-label">Total Geral</div><div class="rc-value">R$'+tG.toFixed(0)+'</div><div class="rc-sub">Vendas + Consultas + Rituais</div></div></div><div class="chart-container"><div class="chart-title">Consultas no Período</div><div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Tipo</th><th>Qtd</th><th>Cobrado</th><th>Recebido</th></tr></thead><tbody><tr><td>Normal</td><td>'+cNo.length+'</td><td>R$'+cnC.toFixed(2)+'</td><td>R$'+cnR.toFixed(2)+'</td></tr><tr><td>Urgência</td><td>'+cUr.length+'</td><td>R$'+cuC.toFixed(2)+'</td><td>R$'+cuR.toFixed(2)+'</td></tr><tr style="font-weight:700;background:var(--accent-bg)"><td>TOTAL</td><td>'+consP.length+'</td><td>R$'+tcC.toFixed(2)+'</td><td>R$'+tcR.toFixed(2)+'</td></tr></tbody></table></div></div></div>'}
 function renderUsuarios(){var h='<div style="margin-bottom:12px"><button class="btn btn-primary" onclick="openAddUser()">+ Usuário</button><button class="btn btn-outline" onclick="loadUsuarios()" style="margin-left:8px">Atualizar Lista</button></div>';if(!S._authUsers||!S._authUsers.length){h+='<div class="empty-state">Carregando usuários...<br><button class="btn btn-sm btn-info" onclick="loadUsuarios()">Carregar</button></div>';return h}S._authUsers.forEach(function(u){h+='<div class="user-card"><div class="user-info"><div class="user-avatar avatar-'+u.perfil+'">'+((u?.username || 'Usuario')[0]).toUpperCase()+'</div><div><div style="font-weight:500">'+esc(u.username || 'Usuario')+'</div><div style="font-size:12px;color:var(--text2)">'+u.perfil+'</div><div style="font-size:11px;color:var(--text3)">'+esc(u.email||'')+'</div></div></div><div style="display:flex;gap:6px"><button class="btn btn-sm btn-outline" onclick="openChgPwd(\''+esc(u.username)+'\')">Nova Senha</button></div></div>'});return h}
 function renderHistorico(){
 if(!S.history.length)return '<div class="empty-state">Nenhum registro</div>';
@@ -923,6 +1022,7 @@ if(m==='flowSearch')return mFlowSearch();if(m==='flowCreate')return mFlowCreate(
 if(m==='flowCiclo')return mFlowCiclo();
 if(m==='flowVenda')return mFlowVenda();
 if(m==='flowConsulta')return mFlowConsulta();
+if(m==='flowRitual')return mFlowRitual();
 if(m==='addCiclo')return mAddCiclo();if(m==='addInter'||m==='editInter')return mInter();
 if(m==='rastreio')return mRastreio();if(m==='confirmConsulta')return mConfirmConsulta();if(m==='changeConsPag')return mChangeConsPag();
 if(m==='addCrediario')return mAddCrediario();if(m==='pagCrediario')return mPagCrediario();
@@ -932,13 +1032,13 @@ function MO(){return ''}
 
 function mItem(){var e=S.editItem;return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>'+(e?'Editar':'Novo')+' Item</h3><div class="form-group"><label>Nome</label><input id="mNome" value="'+esc(e?e.nome:'')+'"></div><div class="form-group"><label>Tipo</label><select id="mTipo">'+TIPOS.map(function(x){return '<option'+(e&&e.tipo===x?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'</select></div><div class="form-group"><label>Seção</label><select id="mSecao">'+SECOES.map(function(x){return '<option'+(e&&e.secao===x?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'</select></div><div class="form-group"><label>Local</label><input id="mLoc" value="'+esc(e?e.localizacao:'')+'"></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveItem()">Salvar</button></div></div></div>'}
 
-function mPessoa(){var isE=S.modal==='editPessoa';var p=isE?getPessoa(S.editItem):null;return '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide"><h3>'+(isE?'Editar':'Novo')+' Cliente</h3><div class="form-group"><label>Foto</label><input type="file" id="pFoto" accept="image/*"></div><div class="form-group-row"><div class="form-group"><label>Nome *</label><input id="pNome" value="'+esc(p?p.nome:'')+'"></div><div class="form-group"><label>Telefone</label><input id="pTel" value="'+esc(p?p.telefone:'')+'"></div></div><div class="form-group-row"><div class="form-group"><label>Nome da mãe</label><input id="pMae" value="'+esc(p?p.nomeMae||'':'')+'"></div><div class="form-group"><label>Email</label><input id="pEmail" value="'+esc(p?p.email:'')+'"></div></div><div class="form-group-row"><div class="form-group"><label>Nascimento</label><input type="date" id="pNasc" value="'+(p?p.dataNascimento||'':'')+'"></div><div class="form-group"><label>Origem</label><select id="pOrigem">'+ORIGENS.map(function(o){return '<option'+(p&&p.origem===o?' selected':'')+'>'+o+'</option>'}).join('')+'</select></div></div><fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin:8px 0"><legend style="font-size:13px;font-weight:600;padding:0 6px">Endereço</legend><div class="form-group-row"><div class="form-group"><label>Logradouro</label><input id="pLog" value="'+esc(p?p.logradouro||'':'')+'"></div><div class="form-group"><label>Número</label><input id="pNum" value="'+esc(p?p.numero||'':'')+'"></div></div><div class="form-group-row"><div class="form-group"><label>Complemento</label><input id="pComp2" value="'+esc(p?p.complemento||'':'')+'"></div><div class="form-group"><label>Bairro</label><input id="pBairro" value="'+esc(p?p.bairro||'':'')+'"></div></div><div class="form-group-3"><div class="form-group"><label>Cidade</label><input id="pCidade" value="'+esc(p?p.cidade||'':'')+'"></div><div class="form-group"><label>Estado</label><input id="pEstado" value="'+esc(p?p.estado||'':'')+'"></div><div class="form-group"><label>CEP</label><input id="pCep" value="'+esc(p?p.cep||'':'')+'"></div></div><div class="form-group"><label>País</label><input id="pPais" value="'+esc(p?p.pais||'Brasil':'Brasil')+'"></div></fieldset><div class="form-group"><label>Obs</label><textarea id="pObs">'+esc(p&&p.observacoes?p.observacoes:'')+'</textarea></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="savePessoa()">Salvar</button></div></div></div>'}
+function mPessoa(){var isE=S.modal==='editPessoa';var p=isE?getPessoa(S.editItem):null;return '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide"><h3>'+(isE?'Editar':'Novo')+' Cliente</h3><div class="form-group"><label>Foto</label><input type="file" id="pFoto" accept="image/*"></div><div class="form-group-row"><div class="form-group"><label>Nome *</label><input id="pNome" value="'+esc(p?p.nome:'')+'"></div><div class="form-group"><label>Telefone</label>'+phoneInput('pTel',p?p.telefone:'','Número')+'</div></div><div class="form-group-row"><div class="form-group"><label>Nome da mãe</label><input id="pMae" value="'+esc(p?p.nomeMae||'':'')+'"></div><div class="form-group"><label>Email</label><input id="pEmail" value="'+esc(p?p.email:'')+'"></div></div><div class="form-group-row"><div class="form-group"><label>Nascimento</label><input type="date" id="pNasc" value="'+(p?p.dataNascimento||'':'')+'"></div><div class="form-group"><label>Origem</label><select id="pOrigem">'+ORIGENS.map(function(o){return '<option'+(p&&p.origem===o?' selected':'')+'>'+o+'</option>'}).join('')+'</select></div></div><fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin:8px 0"><legend style="font-size:13px;font-weight:600;padding:0 6px">Endereço</legend><div class="form-group-row"><div class="form-group"><label>Logradouro</label><input id="pLog" value="'+esc(p?p.logradouro||'':'')+'"></div><div class="form-group"><label>Número</label><input id="pNum" value="'+esc(p?p.numero||'':'')+'"></div></div><div class="form-group-row"><div class="form-group"><label>Complemento</label><input id="pComp2" value="'+esc(p?p.complemento||'':'')+'"></div><div class="form-group"><label>Bairro</label><input id="pBairro" value="'+esc(p?p.bairro||'':'')+'"></div></div><div class="form-group-3"><div class="form-group"><label>Cidade</label><input id="pCidade" value="'+esc(p?p.cidade||'':'')+'"></div><div class="form-group"><label>Estado</label><input id="pEstado" value="'+esc(p?p.estado||'':'')+'"></div><div class="form-group"><label>CEP</label><input id="pCep" value="'+esc(p?p.cep||'':'')+'"></div></div><div class="form-group"><label>País</label><input id="pPais" value="'+esc(p?p.pais||'Brasil':'Brasil')+'"></div></fieldset><div class="form-group"><label>Obs</label><textarea id="pObs">'+esc(p&&p.observacoes?p.observacoes:'')+'</textarea></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="savePessoa()">Salvar</button></div></div></div>'}
 
 function mViewCons(){var c=S.editConsulente;if(!c)return '';var tl=(c.tipoConsulta==='urgencia')?'Urgência':'Normal';return '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide"><h3>'+esc(c.nomeCompleto)+'</h3><div class="detail-grid"><div><div class="dl">Mãe</div><div class="dv">'+esc(c.nomeMae||'—')+'</div></div><div><div class="dl">Nascimento</div><div class="dv">'+fmtDate(c.dataNascimento)+'</div></div><div><div class="dl">Data Consulta</div><div class="dv">'+fmtDate(c.dataConsulta)+'</div></div><div><div class="dl">Horário</div><div class="dv">'+esc(c.horarioConsulta||'—')+'</div></div><div><div class="dl">Formato</div><div class="dv">'+esc(c.formatoConsulta||'—')+'</div></div><div><div class="dl">Modalidade</div><div class="dv">'+tl+'</div></div><div><div class="dl">Valor Cobrado</div><div class="dv">R$'+(c.valorCobrado||0).toFixed(2)+'</div></div><div><div class="dl">Valor Recebido</div><div class="dv">R$'+(c.valorRecebido||0).toFixed(2)+'</div></div><div><div class="dl">Status</div><div class="dv"><span class="status-badge st-'+c.statusFluxo+'">'+statusLabel(c.statusFluxo)+'</span></div></div><div><div class="dl">Pagamento</div><div class="dv"><span class="pag-badge pag-'+c.statusPagamento+'">'+pagLabel(c.statusPagamento)+'</span></div></div><div><div class="dl">Telefone</div><div class="dv">'+esc(c.telefoneWhatsApp||'—')+'</div></div><div><div class="dl">Endereço</div><div class="dv">'+esc(endCompleto(c))+'</div></div></div>'+(c.statusFluxo==='aguardando_prescricao'?'<button class="btn btn-warning" style="margin-top:12px" onclick="closeModal();goPrescrPage('+c.id+')">Prescrição</button>':'')+'<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal();openChangeConsPag('+c.id+')">Alterar Pagamento</button><button class="btn btn-outline" onclick="closeModal()">Fechar</button></div></div></div>'}
 
-function mFlowSearch(){var t=S.flowType==='venda'?'Nova Venda':S.flowType==='consulta'?'Nova Consulta':'Buscar';var q=S.search.trim();var res=q?S.pessoas.filter(function(p){return fuzzy(q,p.nome+' '+(p.telefone||''))}):[];return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>'+t+'</h3><div class="form-group"><label>Nome ou telefone</label><input id="fSearch" placeholder="Digite..." value="'+esc(q)+'" oninput="flowLive(this.value)"></div><div id="fRes" style="max-height:220px;overflow-y:auto;border:1px solid var(--border2);border-radius:var(--radius);margin-bottom:12px">'+(q&&res.length?res.map(function(p){return '<div class="search-result" onclick="flowSelect('+p.id+')"><div class="sr-avatar">'+esc(p.nome[0])+'</div><div style="flex:1"><div style="font-weight:500">'+esc(p.nome)+'</div><div style="font-size:12px;color:var(--text2)">'+esc(p.telefone||'')+'</div></div></div>'}).join(''):'<div style="padding:16px;text-align:center;color:var(--text3)">'+(q?'Nenhum':'Digite...')+'</div>')+'</div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button>'+(S.flowType!=='buscar'?'<button class="btn btn-primary" onclick="S.modal=\'flowCreate\';render()">Novo Cliente</button>':'')+'</div></div></div>'}
-function mFlowCreate(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Novo Cliente</h3><div class="form-group"><label>Nome *</label><input id="fcNome"></div><div class="form-group"><label>Telefone</label><input id="fcTel"></div><div class="form-group"><label>Origem</label><select id="fcOrig"><option>loja_online</option><option>direto</option>'+ORIGENS.map(function(o){return '<option>'+o+'</option>'}).join('')+'</select></div><div class="modal-actions"><button class="btn btn-outline" onclick="S.modal=\'flowSearch\';render()">Voltar</button><button class="btn btn-primary" onclick="flowCreateDone()">Criar</button></div></div></div>'}
-function mFlowCiclo(){if(S.flowType==='consulta'){S.modal='flowConsulta';return mFlowConsulta()}if(S.flowType==='venda'){S.modal='flowVenda';S.vendaItems=[{nome:'',qtd:1,valorUnit:0}];return mFlowVenda()}return ''}
+function mFlowSearch(){var t=S.flowType==='venda'?'Nova Venda':S.flowType==='consulta'?'Nova Consulta':S.flowType==='ritual'?'Novo Ritual':'Buscar';var q=S.search.trim();var res=q?S.pessoas.filter(function(p){return fuzzy(q,p.nome+' '+(p.telefone||''))}):[];return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>'+t+'</h3><div class="form-group"><label>Nome ou telefone</label><input id="fSearch" placeholder="Digite..." value="'+esc(q)+'" oninput="flowLive(this.value)"></div><div id="fRes" style="max-height:220px;overflow-y:auto;border:1px solid var(--border2);border-radius:var(--radius);margin-bottom:12px">'+(q&&res.length?res.map(function(p){return '<div class="search-result" onclick="flowSelect('+p.id+')"><div class="sr-avatar">'+esc(p.nome[0])+'</div><div style="flex:1"><div style="font-weight:500">'+esc(p.nome)+'</div><div style="font-size:12px;color:var(--text2)">'+esc(p.telefone||'')+'</div></div></div>'}).join(''):'<div style="padding:16px;text-align:center;color:var(--text3)">'+(q?'Nenhum':'Digite...')+'</div>')+'</div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button>'+(S.flowType!=='buscar'?'<button class="btn btn-primary" onclick="S.modal=\'flowCreate\';render()">Novo Cliente</button>':'')+'</div></div></div>'}
+function mFlowCreate(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Novo Cliente</h3><div class="form-group"><label>Nome *</label><input id="fcNome"></div><div class="form-group"><label>Telefone</label>'+phoneInput('fcTel','','Número')+'</div><div class="form-group"><label>Origem</label><select id="fcOrig"><option>loja_online</option><option>direto</option>'+ORIGENS.map(function(o){return '<option>'+o+'</option>'}).join('')+'</select></div><div class="modal-actions"><button class="btn btn-outline" onclick="S.modal=\'flowSearch\';render()">Voltar</button><button class="btn btn-primary" onclick="flowCreateDone()">Criar</button></div></div></div>'}
+function mFlowCiclo(){if(S.flowType==='consulta'){S.modal='flowConsulta';return mFlowConsulta()}if(S.flowType==='venda'){S.modal='flowVenda';S.vendaItems=[{nome:'',qtd:1,valorUnit:0}];return mFlowVenda()}if(S.flowType==='ritual'){S.modal='flowRitual';S.ritualData={titulo:'',descricao:'',valor:0,ebos:[{titulo:'',descricao:'',valor:0}]};return mFlowRitual()}return ''}
 
 // === VENDA FLOW MODAL ===
 function mFlowVenda(){
@@ -946,9 +1046,9 @@ var p=getPessoa(S.flowPessoaId);var items=S.vendaItems;
 var subtotal=0;items.forEach(function(it){subtotal+=it.qtd*(it.valorUnit||0)});
 return '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide"><h3>Nova Venda \u2014 '+esc(p?p.nome:'')+'</h3>'+
 '<div style="font-size:13px;font-weight:600;margin-bottom:8px">Itens</div>'+
-'<div id="vendaItemsList">'+items.map(function(it,i){return '<div class="venda-item"><input placeholder="Item" value="'+esc(it.nome)+'" onchange="S.vendaItems['+i+'].nome=this.value"><input type="number" min="1" value="'+it.qtd+'" onchange="S.vendaItems['+i+'].qtd=parseInt(this.value)||1;render()"><input placeholder="V.Unit" value="'+(it.valorUnit||'')+'" onchange="S.vendaItems['+i+'].valorUnit=parseFloat(this.value)||0;render()"><div style="font-size:13px;font-weight:600">R$'+(it.qtd*(it.valorUnit||0)).toFixed(2)+'</div><button style="color:var(--danger);font-size:16px" onclick="removeVendaItem('+i+')">X</button></div>'}).join('')+'</div>'+
+'<div id="vendaItemsList">'+items.map(function(it,i){return '<div class="venda-item"><input placeholder="Item" value="'+esc(it.nome)+'" onchange="S.vendaItems['+i+'].nome=this.value"><input type="number" min="1" value="'+it.qtd+'" onchange="S.vendaItems['+i+'].qtd=parseInt(this.value)||1;render()">'+currencyInput('vuItem'+i,it.valorUnit,'V.Unit','S.vendaItems['+i+'].valorUnit=parseFloat(this.value)||0;render()')+'<div style="font-size:13px;font-weight:600">R$'+(it.qtd*(it.valorUnit||0)).toFixed(2)+'</div><button style="color:var(--danger);font-size:16px" onclick="removeVendaItem('+i+')">X</button></div>'}).join('')+'</div>'+
 '<button class="btn btn-sm btn-outline" onclick="addVendaItem()" style="margin-top:4px">+ Item</button>'+
-'<div class="form-group-row" style="margin-top:12px"><div class="form-group"><label>Tipo de frete</label><select id="vFrete">'+TIPO_FRETE.map(function(f){return '<option value="'+f+'">'+freteLabel(f)+'</option>'}).join('')+'</select></div><div class="form-group"><label>Valor do frete</label><input id="vFreteVal" type="number" step="0.01" value="0"></div></div>'+
+'<div class="form-group-row" style="margin-top:12px"><div class="form-group"><label>Tipo de frete</label><select id="vFrete">'+TIPO_FRETE.map(function(f){return '<option value="'+f+'">'+freteLabel(f)+'</option>'}).join('')+'</select></div><div class="form-group"><label>Valor do frete</label>'+currencyInput('vFreteVal',0,'0,00','var sub=0;S.vendaItems.forEach(function(it){sub+=it.qtd*(it.valorUnit||0)});var t=sub+(parseFloat(this.value)||0);var el=document.getElementById(\'vTotalFinal\');if(el)el.textContent=\'R$\'+t.toFixed(2)')+'</div></div>'+
 '<div id="vFreteOutro" style="display:none" class="form-group"><label>Descreva o frete</label><input id="vFreteDesc"></div>'+
 '<div class="venda-totals"><div class="vt-row"><span>Subtotal:</span><span>R$'+subtotal.toFixed(2)+'</span></div><div class="vt-row vt-total"><span>Total c/ frete:</span><span id="vTotalFinal">R$'+subtotal.toFixed(2)+'</span></div></div>'+
 '<div class="form-group-row" style="margin-top:12px"><div class="form-group"><label>Pagamento</label><select id="vPag"><option>pix</option><option>cartao</option><option>dinheiro</option><option>transferencia</option><option>outro</option></select></div><div class="form-group"><label>Comprovante</label><input type="file" id="vComp" accept="image/*"></div></div>'+
@@ -960,14 +1060,14 @@ var p=getPessoa(S.flowPessoaId);var pN=p?p.nome:'',pM=p?p.nomeMae||'':'',pNa=p?p
 return '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide"><h3>Nova Consulta</h3>'+
 '<div style="background:var(--accent-bg);padding:10px 14px;border-radius:var(--radius);margin-bottom:14px;display:flex;align-items:center;gap:10px"><div class="sr-avatar">'+esc(pN?pN[0]:'?')+'</div><div><div style="font-weight:600">'+esc(pN)+'</div><div style="font-size:12px;color:var(--text2)">'+esc(pW)+'</div></div></div>'+
 '<div class="form-group-row"><div class="form-group"><label>Nome completo *</label><input id="fcNome2" value="'+esc(pN)+'"></div><div class="form-group"><label>Nome da mãe</label><input id="fcMae" value="'+esc(pM)+'"></div></div>'+
-'<div class="form-group-row"><div class="form-group"><label>Nascimento</label><input type="date" id="fcNasc" value="'+pNa+'"></div><div class="form-group"><label>WhatsApp</label><input id="fcWhats" value="'+esc(pW)+'"></div></div>'+
+'<div class="form-group-row"><div class="form-group"><label>Nascimento</label><input type="date" id="fcNasc" value="'+pNa+'"></div><div class="form-group"><label>WhatsApp</label>'+phoneInput('fcWhats',pW,'Número')+'</div></div>'+
 '<div class="form-group-row"><div class="form-group"><label>Data consulta *</label><input type="date" id="fcDataCons"></div><div class="form-group"><label>Horário</label><input type="time" id="fcHorario"></div></div>'+
 '<div class="form-group-row"><div class="form-group"><label>Formato</label><select id="fcFormato">'+FORMATOS.map(function(f){return '<option>'+f+'</option>'}).join('')+'</select></div><div class="form-group"><label>Origem</label><select id="fcOrigem2">'+ORIGENS.map(function(o){return '<option'+(p&&p.origem===o?' selected':'')+'>'+o+'</option>'}).join('')+'</select></div></div>'+
 '<fieldset style="border:1.5px solid var(--accent);border-radius:var(--radius);padding:14px;margin:10px 0;background:var(--accent-bg)"><legend style="font-size:13px;font-weight:700;padding:0 8px;color:var(--accent)">Tipo e Pagamento</legend>'+
 '<div class="form-group"><label>Tipo de consulta</label><select id="fcTipoConsulta" onchange="updateConsultaPricing()"><option value="normal">Normal - R$500</option><option value="urgencia">Urgência - R$750 (PIX) / R$1000 (Cartão)</option></select></div>'+
 '<div class="form-group"><label>Forma de pagamento</label><select id="fcFormaPag" onchange="updateConsultaPricing()"><option value="pix_avista">PIX à vista</option><option value="pix_50_50">PIX 50% reserva + 50% na consulta</option><option value="link_mercadopago">Link Mercado Pago (até 3x)</option><option value="cartao">Cartão</option></select></div>'+
 '<div id="fcPricingInfo" style="margin-top:8px;padding:10px 14px;border-radius:var(--radius);background:var(--bg3);font-size:13px;line-height:1.6"><strong>PIX à vista:</strong> R$500,00<br>Valor recebido: R$500,00</div>'+
-'<div class="form-group-row" style="margin-top:8px"><div class="form-group"><label>Valor cobrado</label><input id="fcValorCobrado" value="500" type="number" step="0.01"></div><div class="form-group"><label>Valor recebido</label><input id="fcValorRecebido" value="500" type="number" step="0.01"></div></div>'+
+'<div class="form-group-row" style="margin-top:8px"><div class="form-group"><label>Valor cobrado</label>'+currencyInput('fcValorCobrado',500,'0,00','')+'</div><div class="form-group"><label>Valor recebido</label>'+currencyInput('fcValorRecebido',500,'0,00','')+'</div></div>'+
 '<div class="form-group"><label>Status pag.</label><select id="fcSPag">'+STATUS_PAG.map(function(x){return '<option value="'+x+'">'+pagLabel(x)+'</option>'}).join('')+'</select></div>'+
 '</fieldset>'+
 '<fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin:8px 0"><legend style="font-size:13px;font-weight:600;padding:0 6px">Endereço</legend>'+
@@ -979,6 +1079,48 @@ return '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide"><h3>Nov
 '<div class="form-group"><label>Status fluxo</label><select id="fcSFluxo">'+STATUS_FLUXO.map(function(s){return '<option value="'+s.key+'">'+s.label+'</option>'}).join('')+'</select></div>'+
 '<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="finishConsulta()">Cadastrar</button></div></div></div>'}
 
+// === RITUAL FLOW MODAL ===
+function mFlowRitual(){
+var p=getPessoa(S.flowPessoaId);
+if(!S.ritualData)S.ritualData={titulo:'',descricao:'',valor:0,ebos:[{titulo:'',descricao:'',valor:0}]};
+var rd=S.ritualData;
+// Calculate total
+var ritualVal=parseFloat(rd.valor)||0;
+var ebosTotal=0;(rd.ebos||[]).forEach(function(e){ebosTotal+=parseFloat(e.valor)||0});
+var total=ritualVal+ebosTotal;
+var pM=p?p.nomeMae||'':'';var pNa=p?p.dataNascimento||'':'';var pW=p?p.telefone||'':'';var pE=p?p.email||'':'';
+var pL=p?p.logradouro||'':'';var pN=p?p.numero||'':'';var pC=p?p.complemento||'':'';var pB=p?p.bairro||'':'';var pCi=p?p.cidade||'':'';var pEs=p?p.estado||'':'';var pCe=p?p.cep||'':'';var pP=p?p.pais||'Brasil':'Brasil';
+var ebosHtml=(rd.ebos||[]).map(function(e,i){return '<div class="ebo-block"><div class="ebo-header"><span class="ebo-num">Ebó #'+(i+1)+'</span>'+((rd.ebos.length>1)?'<button type="button" class="ebo-remove" onclick="removeRitualEbo('+i+')">Remover</button>':'')+'</div>'+
+'<div class="form-group"><label>Título</label><input id="reTit'+i+'" value="'+esc(e.titulo||'')+'" onchange="S.ritualData.ebos['+i+'].titulo=this.value" placeholder="Ex: Ebó para Esu"></div>'+
+'<div class="form-group"><label>Descrição</label><textarea id="reDesc'+i+'" rows="2" onchange="S.ritualData.ebos['+i+'].descricao=this.value" placeholder="Detalhes do ebó...">'+esc(e.descricao||'')+'</textarea></div>'+
+'<div class="form-group"><label>Valor</label>'+currencyInput('reVal'+i,e.valor,'0,00','S.ritualData.ebos['+i+'].valor=parseFloat(this.value)||0;render()')+'</div>'+
+'</div>'}).join('');
+return '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide"><h3>Novo Ritual \u2014 '+esc(p?p.nome:'')+'</h3>'+
+'<div style="background:var(--warning-bg);padding:10px 14px;border-radius:var(--radius);margin-bottom:14px;font-size:13px"><strong>Ritual sem consulta</strong> — todos os dados do consulente são preenchidos (sem data de consulta).</div>'+
+'<fieldset style="border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px"><legend style="font-size:13px;font-weight:700;padding:0 8px;color:var(--accent)">Dados do Cliente (cadastro)</legend>'+
+'<div class="form-group-row"><div class="form-group"><label>Nome completo *</label><input id="frNome" value="'+esc(p?p.nome:'')+'"></div><div class="form-group"><label>Nome da mãe</label><input id="frMae" value="'+esc(pM)+'"></div></div>'+
+'<div class="form-group-row"><div class="form-group"><label>Nascimento</label><input type="date" id="frNasc" value="'+pNa+'"></div><div class="form-group"><label>Email</label><input type="email" id="frEmail" value="'+esc(pE)+'"></div></div>'+
+'<div class="form-group"><label>Telefone / WhatsApp</label>'+phoneInput('frTel',pW,'Número')+'</div>'+
+'<div class="form-group"><label>Origem</label><select id="frOrigem">'+ORIGENS.map(function(o){return '<option'+(p&&p.origem===o?' selected':'')+'>'+o+'</option>'}).join('')+'</select></div>'+
+'<fieldset style="border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-top:8px"><legend style="font-size:12px;font-weight:600;padding:0 6px">Endereço</legend>'+
+'<div class="form-group-row"><div class="form-group"><label>Logradouro</label><input id="frLog" value="'+esc(pL)+'"></div><div class="form-group"><label>Número</label><input id="frNum" value="'+esc(pN)+'"></div></div>'+
+'<div class="form-group-row"><div class="form-group"><label>Complemento</label><input id="frComp" value="'+esc(pC)+'"></div><div class="form-group"><label>Bairro</label><input id="frBairro" value="'+esc(pB)+'"></div></div>'+
+'<div class="form-group-row"><div class="form-group"><label>Cidade</label><input id="frCidade" value="'+esc(pCi)+'"></div><div class="form-group"><label>Estado</label><input id="frEstado" value="'+esc(pEs)+'"></div></div>'+
+'<div class="form-group-row"><div class="form-group"><label>CEP</label><input id="frCep" value="'+esc(pCe)+'"></div><div class="form-group"><label>País</label><input id="frPais" value="'+esc(pP)+'"></div></div>'+
+'</fieldset></fieldset>'+
+'<fieldset style="border:1.5px solid var(--accent);border-radius:var(--radius);padding:14px;margin-bottom:10px;background:var(--accent-bg)"><legend style="font-size:13px;font-weight:700;padding:0 8px;color:var(--accent)">Ritual</legend>'+
+'<div class="form-group"><label>Título *</label><input id="frTit" value="'+esc(rd.titulo||'')+'" onchange="S.ritualData.titulo=this.value" placeholder="Ex: Ritual de Abertura de Caminhos"></div>'+
+'<div class="form-group"><label>Descrição</label><textarea id="frDesc" rows="3" onchange="S.ritualData.descricao=this.value" placeholder="Detalhes do ritual...">'+esc(rd.descricao||'')+'</textarea></div>'+
+'<div class="form-group"><label>Valor do ritual</label>'+currencyInput('frVal',rd.valor,'0,00','S.ritualData.valor=parseFloat(this.value)||0;render()')+'</div>'+
+'</fieldset>'+
+'<fieldset style="border:1.5px solid var(--purple);border-radius:var(--radius);padding:14px;margin-bottom:10px;background:var(--purple-bg)"><legend style="font-size:13px;font-weight:700;padding:0 8px;color:var(--purple)">Ebós ('+(rd.ebos||[]).length+')</legend>'+
+'<div style="font-size:12px;color:var(--text2);margin-bottom:10px">Um ritual pode incluir vários ebós. Adicione quantos forem necessários.</div>'+
+ebosHtml+
+'<button type="button" class="btn btn-sm btn-purple" onclick="addRitualEbo()" style="margin-top:4px">+ Adicionar Ebó</button>'+
+'</fieldset>'+
+'<div class="ebo-total-bar"><span>TOTAL (Ritual + Ebós):</span><span>R$ '+total.toFixed(2).replace('.',',')+'</span></div>'+
+'<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="finishRitual()">Registrar Ritual</button></div></div></div>'}
+
 function mAddCiclo(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Novo Ciclo</h3><div class="form-group"><label>Obs</label><textarea id="ciObs" rows="3"></textarea></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveNewCiclo()">Criar</button></div></div></div>'}
 function mInter(){var isE=S.modal==='editInter';var e=isE?S.interacoes.find(function(x){return x.id===S.editItem}):null;return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>'+(isE?'Editar':'Nova')+' Interação</h3><div class="form-group"><label>Tipo</label><select id="itTipo">'+TIPO_INTERACAO.map(function(t){return '<option value="'+t+'"'+(e&&e.tipo===t?' selected':'')+'>'+interLabel(t)+'</option>'}).join('')+'</select></div><div class="form-group"><label>Data</label><input type="date" id="itData" value="'+(e?e.data:today())+'"></div><div class="form-group"><label>Desc</label><textarea id="itDesc" rows="3">'+esc(e?e.descricao:'')+'</textarea></div><div class="form-group"><label>Valor</label><input id="itVal" value="'+esc(e?e.valor:'')+'"></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveInter()">Salvar</button></div></div></div>'}
 function mUser(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Novo Usuário</h3><div class="form-group"><label>Usuário</label><input id="mUser2"></div><div class="form-group"><label>Senha</label><div class="input-wrap"><input id="mPass" type="password" placeholder="Digite a senha"><button class="eye-btn" onclick="var i=document.getElementById(\'mPass\');i.type=i.type===\'password\'?\'text\':\'password\'">\u{1F441}\uFE0F</button></div></div><div class="form-group"><label>Confirmar senha</label><div class="input-wrap"><input id="mPassConf" type="password" placeholder="Repita a senha"><button class="eye-btn" onclick="var i=document.getElementById(\'mPassConf\');i.type=i.type===\'password\'?\'text\':\'password\'">\u{1F441}\uFE0F</button></div></div><div class="form-group"><label>Perfil</label><select id="mPerfil">'+PERFIS.map(function(p){return '<option>'+p+'</option>'}).join('')+'</select></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveUser()">Criar</button></div></div></div>'}
@@ -987,8 +1129,8 @@ function mConfirm(){return '<div class="modal-overlay"><div class="modal"><div s
 function mConfirmConsulta(){var c=S.editConsulente;if(!c)return '';var tl=(c.tipoConsulta==='urgencia')?'Urgência':'Normal';var fl={'pix_avista':'PIX à vista','pix_50_50':'PIX 50%+50%','link_mercadopago':'Link Mercado Pago','cartao':'Cartão'}[c.formaPagamento]||c.formaPagamento||'';var pt=c.statusPagamento==='pago'?'Efetuado':'Pendente';var wt='*Confirmação de consulta*\n'+c.nomeCompleto+'\n'+(c.nomeMae?'filho(a) de '+c.nomeMae+'\n':'')+(c.dataNascimento?'Nascido(a) em '+fmtDate(c.dataNascimento)+'\n':'')+'Data da consulta: '+fmtDate(c.dataConsulta)+'\n'+(c.horarioConsulta?'Horário: '+c.horarioConsulta+'\n':'')+(c.formatoConsulta?'Formato: '+c.formatoConsulta+'\n':'')+'Modalidade: '+tl+'\nValor: R$'+(c.valorCobrado||0).toFixed(2)+'\nPagamento: '+pt+(fl?' via '+fl:'')+'.';return '<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal modal-wide"><h3>Confirmar Consulta</h3><div class="detail-grid"><div><div class="dl">Consulente</div><div class="dv">'+esc(c.nomeCompleto)+'</div></div><div><div class="dl">Mãe</div><div class="dv">'+esc(c.nomeMae||'—')+'</div></div><div><div class="dl">Nascimento</div><div class="dv">'+fmtDate(c.dataNascimento)+'</div></div><div><div class="dl">Data Consulta</div><div class="dv">'+fmtDate(c.dataConsulta)+'</div></div><div><div class="dl">Horário</div><div class="dv">'+esc(c.horarioConsulta||'—')+'</div></div><div><div class="dl">Formato</div><div class="dv">'+esc(c.formatoConsulta||'—')+'</div></div><div><div class="dl">Modalidade</div><div class="dv">'+tl+'</div></div><div><div class="dl">Valor Cobrado</div><div class="dv">R$'+(c.valorCobrado||0).toFixed(2)+'</div></div><div><div class="dl">Valor Recebido</div><div class="dv">R$'+(c.valorRecebido||0).toFixed(2)+'</div></div><div><div class="dl">Pagamento</div><div class="dv"><span class="pag-badge pag-'+c.statusPagamento+'">'+pagLabel(c.statusPagamento)+'</span></div></div><div><div class="dl">Telefone</div><div class="dv">'+esc(c.telefoneWhatsApp||'—')+'</div></div></div><div style="margin-top:16px"><div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;margin-bottom:6px">Texto para WhatsApp (clique para copiar)</div><div id="whatsConfirmText" onclick="copyWhatsConfirm()" style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;font-size:13px;line-height:1.7;white-space:pre-wrap;cursor:pointer">'+esc(wt)+'</div><div id="copyFeedback" style="font-size:11px;color:var(--success);margin-top:4px;opacity:0;transition:opacity .3s">✔ Copiado!</div></div><div style="background:var(--success-bg);padding:12px;border-radius:var(--radius);margin-top:16px;font-size:13px;color:var(--success)">Ao confirmar, o status será alterado para <strong>Aguardando Prescrição</strong>.</div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-success" onclick="doConfirmConsulta()">Confirmar Consulta</button></div></div></div>'}
 function mChangeConsPag(){var c=S.editConsulente;if(!c)return '';var opts=STATUS_PAG.map(function(sp){return '<option value="'+sp+'"'+(c.statusPagamento===sp?' selected':'')+'>'+pagLabel(sp)+'</option>'}).join('');return '<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal"><h3>Alterar Pagamento</h3><div style="font-size:14px;margin-bottom:12px">'+esc(c.nomeCompleto)+' — R$'+(c.valorCobrado||0).toFixed(2)+'</div><div class="form-group"><label>Status de Pagamento</label><select id="mConsPagStatus">'+opts+'</select></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="doChangeConsPag()">Salvar</button></div></div></div>'}
 function mRastreio(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Código de Rastreio</h3><div class="form-group"><label>Código</label><input id="mRastreio"></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveRastreio()">Salvar</button></div></div></div>'}
-function mAddCrediario(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Novo Crediário</h3><div class="form-group"><label>Cliente</label><select id="crCliente">'+S.pessoas.map(function(p){return '<option value="'+p.id+'">'+esc(p.nome)+'</option>'}).join('')+'</select></div><div class="form-group"><label>Descrição</label><textarea id="crDesc" rows="2"></textarea></div><div class="form-group"><label>Valor Total</label><input id="crValor" type="number" step="0.01"></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveCrediario()">Criar</button></div></div></div>'}
-function mPagCrediario(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Pagamento</h3><div class="form-group"><label>Valor</label><input id="pgVal" type="number" step="0.01"></div><div class="form-group"><label>Forma</label><select id="pgForma"><option>pix</option><option>cartao</option><option>dinheiro</option><option>transferencia</option></select></div><div class="form-group"><label>Comprovante</label><input type="file" id="pgComp" accept="image/*"></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="savePagCrediario()">Registrar</button></div></div></div>'}
+function mAddCrediario(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Novo Crediário</h3><div class="form-group"><label>Cliente</label><select id="crCliente">'+S.pessoas.map(function(p){return '<option value="'+p.id+'">'+esc(p.nome)+'</option>'}).join('')+'</select></div><div class="form-group"><label>Descrição</label><textarea id="crDesc" rows="2"></textarea></div><div class="form-group"><label>Valor Total</label>'+currencyInput('crValor',0,'0,00','')+'</div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveCrediario()">Criar</button></div></div></div>'}
+function mPagCrediario(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Pagamento</h3><div class="form-group"><label>Valor</label>'+currencyInput('pgVal',0,'0,00','')+'</div><div class="form-group"><label>Forma</label><select id="pgForma"><option>pix</option><option>cartao</option><option>dinheiro</option><option>transferencia</option></select></div><div class="form-group"><label>Comprovante</label><input type="file" id="pgComp" accept="image/*"></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="savePagCrediario()">Registrar</button></div></div></div>'}
 
 function mLivro(){var isE=S.modal==='editLivro';var l=isE?S.livros.find(function(x){return x.id===S.editItem}):null;
 return '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide"><h3>'+(isE?'Editar':'Novo')+' Livro</h3>'+
@@ -1013,7 +1155,7 @@ window.saveItem=function(){var n=document.getElementById('mNome').value.trim();v
 
 window.openAddPessoa=function(){S.editItem=null;S.modal='addPessoa';render()};
 window.openEditPessoa=function(id){S.editItem=id;S.modal='editPessoa';render()};
-window.savePessoa=async function(){var n=document.getElementById('pNome').value.trim();var tel=document.getElementById('pTel').value.trim();var email=document.getElementById('pEmail').value.trim();var nasc=document.getElementById('pNasc').value;
+window.savePessoa=async function(){var n=document.getElementById('pNome').value.trim();var tel=readPhone('pTel');var email=document.getElementById('pEmail').value.trim();var nasc=document.getElementById('pNasc').value;
 var err=runValidation([validateText(n,2,200,'Nome'),validatePhone(tel),validateEmail(email),validateDate(nasc)]);
 if(err)return toast(err,'error');
 var isE=S.modal==='editPessoa';
@@ -1036,7 +1178,7 @@ window.startFlow=function(t){S.flowType=t;S.search='';S.modal='flowSearch';rende
 window.startFlowFor=function(pid,t){S.flowType=t;S.flowPessoaId=pid;S.modal='flowCiclo';render()};
 window.flowLive=function(v){S.search=v;var el=document.getElementById('fRes');if(!el)return;var res=v.trim()?S.pessoas.filter(function(p){return fuzzy(v,p.nome+' '+(p.telefone||''))}):[];el.innerHTML=v.trim()&&res.length?res.map(function(p){return '<div class="search-result" onclick="flowSelect('+p.id+')"><div class="sr-avatar">'+esc(p.nome[0])+'</div><div style="flex:1"><div style="font-weight:500">'+esc(p.nome)+'</div><div style="font-size:12px;color:var(--text2)">'+esc(p.telefone||'')+'</div></div></div>'}).join(''):'<div style="padding:16px;text-align:center;color:var(--text3)">'+(v.trim()?'Nenhum':'Digite...')+'</div>'};
 window.flowSelect=function(id){S.flowPessoaId=id;if(S.flowType==='buscar'){closeModal();goPerfil(id);return}S.modal='flowCiclo';render()};
-window.flowCreateDone=function(){var n=document.getElementById('fcNome').value.trim();if(!n)return toast('Nome!','error');var tel=document.getElementById('fcTel').value.trim();if(tel&&findByPhone(tel))return toast('Tel existe!','error');var np={id:nid(S.pessoas),nome:n,telefone:tel,email:'',dataNascimento:'',origem:document.getElementById('fcOrig').value,observacoes:'',dataCriacao:today(),foto:'',cidade:'',pais:'Brasil',tags:['cliente_loja'],anexos:[],terceiros:[]};S.pessoas.push(np);addHistDB('+ '+n);S.flowPessoaId=np.id;if(S.flowType==='buscar'){closeModal();goPerfil(np.id);return}S.modal='flowCiclo';render()};
+window.flowCreateDone=function(){var n=document.getElementById('fcNome').value.trim();if(!n)return toast('Nome!','error');var tel=readPhone('fcTel');if(tel&&findByPhone(tel))return toast('Tel existe!','error');var np={id:nid(S.pessoas),nome:n,telefone:tel,email:'',dataNascimento:'',origem:document.getElementById('fcOrig').value,observacoes:'',dataCriacao:today(),foto:'',cidade:'',pais:'Brasil',tags:['cliente_loja'],anexos:[],terceiros:[]};S.pessoas.push(np);addHistDB('+ '+n);S.flowPessoaId=np.id;if(S.flowType==='buscar'){closeModal();goPerfil(np.id);return}S.modal='flowCiclo';render()};
 
 // Finish Venda
 window.finishVenda=async function(){
@@ -1061,22 +1203,116 @@ addHistDB('Venda #'+v.id+' R$'+total.toFixed(2));toast('Venda registrada!');clos
 window.finishConsulta=async function(){
 var nome=document.getElementById('fcNome2').value.trim();
 var dataCons=document.getElementById('fcDataCons').value;
-var whats=document.getElementById('fcWhats').value.trim();
+var whats=readPhone('fcWhats');
 var err=runValidation([validateText(nome,2,200,'Nome'),validateDate(dataCons),validatePhone(whats)]);
 if(err)return toast(err,'error');
 if(!dataCons)return toast('Data da consulta obrigatória!','error');
 var p=getPessoa(S.flowPessoaId);
-if(p){p.nome=nome;p.nomeMae=document.getElementById('fcMae').value.trim();p.dataNascimento=document.getElementById('fcNasc').value;p.telefone=document.getElementById('fcWhats').value.trim();p.cidade=document.getElementById('fcCidade').value.trim();p.pais=document.getElementById('fcPaisC').value.trim()||'Brasil'}
+if(p){p.nome=nome;p.nomeMae=document.getElementById('fcMae').value.trim();p.dataNascimento=document.getElementById('fcNasc').value;p.telefone=whats;p.cidade=document.getElementById('fcCidade').value.trim();p.pais=document.getElementById('fcPaisC').value.trim()||'Brasil'}
 var tipoC=document.getElementById('fcTipoConsulta').value;
 var formaP=document.getElementById('fcFormaPag').value;
 var valCob=parseFloat(document.getElementById('fcValorCobrado').value)||0;
 var valRec=parseFloat(document.getElementById('fcValorRecebido').value)||0;
-var d={id:nid(S.consulentes),nomeCompleto:nome,nomeMae:document.getElementById('fcMae').value.trim(),dataNascimento:document.getElementById('fcNasc').value,telefoneWhatsApp:document.getElementById('fcWhats').value.trim(),dataConsulta:dataCons,horarioConsulta:document.getElementById('fcHorario').value,formatoConsulta:document.getElementById('fcFormato').value,origem:document.getElementById('fcOrigem2').value,tipoConsulta:tipoC,formaPagamento:formaP,valorCobrado:valCob,valorRecebido:valRec,statusPagamento:document.getElementById('fcSPag').value,logradouro:document.getElementById('fcLog').value.trim(),numero:document.getElementById('fcNum').value.trim(),complemento:document.getElementById('fcComp2').value.trim(),bairro:document.getElementById('fcBairro').value.trim(),cidade:document.getElementById('fcCidade').value.trim(),estado:document.getElementById('fcEstado').value.trim(),cep:document.getElementById('fcCep').value.trim(),pais:document.getElementById('fcPaisC').value.trim()||'Brasil',statusFluxo:document.getElementById('fcSFluxo').value,prescricao:'',comprovante:'',pessoaId:S.flowPessoaId,oduResultado:'',oduDescricao:'',consideracoesGerais:'',prescricaoRituais:'',prescricaoMedicinas:'',observacoesPrescricao:''};
+var d={id:nid(S.consulentes),nomeCompleto:nome,nomeMae:document.getElementById('fcMae').value.trim(),dataNascimento:document.getElementById('fcNasc').value,telefoneWhatsApp:whats,dataConsulta:dataCons,horarioConsulta:document.getElementById('fcHorario').value,formatoConsulta:document.getElementById('fcFormato').value,origem:document.getElementById('fcOrigem2').value,tipoConsulta:tipoC,formaPagamento:formaP,valorCobrado:valCob,valorRecebido:valRec,statusPagamento:document.getElementById('fcSPag').value,logradouro:document.getElementById('fcLog').value.trim(),numero:document.getElementById('fcNum').value.trim(),complemento:document.getElementById('fcComp2').value.trim(),bairro:document.getElementById('fcBairro').value.trim(),cidade:document.getElementById('fcCidade').value.trim(),estado:document.getElementById('fcEstado').value.trim(),cep:document.getElementById('fcCep').value.trim(),pais:document.getElementById('fcPaisC').value.trim()||'Brasil',statusFluxo:document.getElementById('fcSFluxo').value,prescricao:'',comprovante:'',pessoaId:S.flowPessoaId,oduResultado:'',oduDescricao:'',consideracoesGerais:'',prescricaoRituais:'',prescricaoMedicinas:'',observacoesPrescricao:'',prescricaoEbos:[]};
 var dbr=await insertRecord('consulentes',consToDB(d));if(dbr)d.id=dbr.id;S.consulentes.push(d);
 var tipoLabel=tipoC==='urgencia'?'Urgência':'Normal';
 var c={id:nid(S.ciclos),pessoaId:S.flowPessoaId,tipo:'consulta',dataInicio:today(),dataFim:'',status:'ativo',observacoes:''};S.ciclos.push(c);
 S.interacoes.push({id:nid(S.interacoes),cicloId:c.id,tipo:'consulta',data:dataCons,descricao:'Consulta '+tipoLabel+': '+nome+' | Cobrado: R$'+valCob.toFixed(2)+' | Recebido: R$'+valRec.toFixed(2),valor:valRec.toFixed(2),formaPagamento:formaP,status:'aguardando_consulta',criadoPor:S.currentUser.username});
 addHistDB('Consulta '+tipoLabel+': '+nome+' R$'+valCob.toFixed(2));agendarGoogle('consulta',{Nome:nome,Data:fmtDate(dataCons)});toast('Cadastrada!');closeModal();goPerfil(S.flowPessoaId)};
+
+// ==================== RITUAL ACTIONS ====================
+window.addRitualEbo=function(){
+// Persist current DOM values first
+if(S.ritualData){
+var tt=document.getElementById('frTit');if(tt)S.ritualData.titulo=tt.value;
+var dd=document.getElementById('frDesc');if(dd)S.ritualData.descricao=dd.value;
+var vv=document.getElementById('frVal');if(vv)S.ritualData.valor=parseFloat(vv.value)||0;
+(S.ritualData.ebos||[]).forEach(function(e,i){
+var t=document.getElementById('reTit'+i);if(t)e.titulo=t.value;
+var d=document.getElementById('reDesc'+i);if(d)e.descricao=d.value;
+var v=document.getElementById('reVal'+i);if(v)e.valor=parseFloat(v.value)||0;
+})}
+S.ritualData.ebos=S.ritualData.ebos||[];
+S.ritualData.ebos.push({titulo:'',descricao:'',valor:0});
+render()};
+
+window.removeRitualEbo=function(i){
+if(!S.ritualData||!S.ritualData.ebos)return;
+// Persist current DOM values first for remaining ebos
+(S.ritualData.ebos||[]).forEach(function(e,idx){
+var t=document.getElementById('reTit'+idx);if(t)e.titulo=t.value;
+var d=document.getElementById('reDesc'+idx);if(d)e.descricao=d.value;
+var v=document.getElementById('reVal'+idx);if(v)e.valor=parseFloat(v.value)||0;
+});
+S.ritualData.ebos.splice(i,1);
+if(!S.ritualData.ebos.length)S.ritualData.ebos=[{titulo:'',descricao:'',valor:0}];
+render()};
+
+window.finishRitual=async function(){
+var p=getPessoa(S.flowPessoaId);if(!p)return toast('Cliente não encontrado!','error');
+// Collect DOM values into ritualData
+var titEl=document.getElementById('frTit');if(titEl)S.ritualData.titulo=titEl.value.trim();
+var descEl=document.getElementById('frDesc');if(descEl)S.ritualData.descricao=descEl.value.trim();
+var valEl=document.getElementById('frVal');if(valEl)S.ritualData.valor=parseFloat(valEl.value)||0;
+(S.ritualData.ebos||[]).forEach(function(e,i){
+var t=document.getElementById('reTit'+i);if(t)e.titulo=t.value.trim();
+var d=document.getElementById('reDesc'+i);if(d)e.descricao=d.value.trim();
+var v=document.getElementById('reVal'+i);if(v)e.valor=parseFloat(v.value)||0;
+});
+// Validate
+var titErr=validateText(S.ritualData.titulo,2,300,'Título do ritual');
+if(titErr)return toast(titErr,'error');
+// Filter empty ebos
+var validEbos=(S.ritualData.ebos||[]).filter(function(e){return (e.titulo||'').trim()});
+if(!validEbos.length)return toast('Adicione pelo menos 1 Ebó com título!','error');
+for(var i=0;i<validEbos.length;i++){var err=validateText(validEbos[i].titulo,1,300,'Ebó '+(i+1)+' título');if(err)return toast(err,'error')}
+// Update pessoa (cadastro do consulente)
+var nomeNovo=document.getElementById('frNome').value.trim();
+if(!nomeNovo)return toast('Nome obrigatório!','error');
+p.nome=nomeNovo;
+p.nomeMae=document.getElementById('frMae').value.trim();
+p.dataNascimento=document.getElementById('frNasc').value;
+p.email=document.getElementById('frEmail').value.trim();
+p.telefone=readPhone('frTel');
+p.origem=document.getElementById('frOrigem').value;
+p.logradouro=document.getElementById('frLog').value.trim();
+p.numero=document.getElementById('frNum').value.trim();
+p.complemento=document.getElementById('frComp').value.trim();
+p.bairro=document.getElementById('frBairro').value.trim();
+p.cidade=document.getElementById('frCidade').value.trim();
+p.estado=document.getElementById('frEstado').value.trim();
+p.cep=document.getElementById('frCep').value.trim();
+p.pais=document.getElementById('frPais').value.trim()||'Brasil';
+await saveRecord('pessoas',p.id,pessoaToDB(p));
+// Create ritual record
+var ritualVal=parseFloat(S.ritualData.valor)||0;
+var ebosTotal=0;validEbos.forEach(function(e){ebosTotal+=parseFloat(e.valor)||0});
+var total=ritualVal+ebosTotal;
+var newR={id:0,pessoaId:p.id,consulenteId:null,titulo:S.ritualData.titulo,descricao:S.ritualData.descricao,valor:ritualVal,ebos:validEbos,data:today(),status:'em_andamento',origem:'avulso',observacoes:''};
+var dbr=await insertRecord('rituais',ritualToDB(newR));if(dbr)newR.id=dbr.id;
+S.rituais.push(newR);
+// Create ciclo + interaction for history tracking
+var c={id:nid(S.ciclos),pessoaId:p.id,tipo:'ritual',dataInicio:today(),dataFim:'',status:'ativo',observacoes:'Ritual: '+newR.titulo};
+var dbc=await insertRecord('ciclos',cicloToDB(c));if(dbc)c.id=dbc.id;
+S.ciclos.push(c);
+var interDesc=newR.titulo+' | '+validEbos.length+' ebó(s) | R$'+total.toFixed(2);
+var inter={id:nid(S.interacoes),cicloId:c.id,tipo:'ebo',data:today(),descricao:interDesc,valor:total.toFixed(2),formaPagamento:'',status:'em_andamento',criadoPor:S.currentUser?S.currentUser.username:'sys'};
+var dbi=await insertRecord('interacoes',interToDB(inter));if(dbi)inter.id=dbi.id;
+S.interacoes.push(inter);
+addHistDB('Ritual: '+newR.titulo+' ('+validEbos.length+' ebós) R$'+total.toFixed(2));
+toast('Ritual registrado!');
+closeModal();
+goPerfil(p.id)};
+
+window.advanceRitual=async function(id){
+var r=S.rituais.find(function(x){return x.id===id});if(!r)return;
+if(r.status==='em_andamento'){r.status='concluido';await saveRecord('rituais',r.id,ritualToDB(r));addHistDB('Ritual '+r.titulo+' concluído');toast('Ritual concluído!');render()}};
+
+window.confirmDelRitual=function(id){
+var r=S.rituais.find(function(x){return x.id===id});if(!r)return;
+S.confirmText='<strong>Excluir ritual "'+esc(r.titulo)+'"?</strong><br>Esta ação é irreversível.';
+S.confirmAction=async function(){await deleteRecord('rituais',r.id);S.rituais=S.rituais.filter(function(x){return x.id!==id});addHistDB('- Ritual excluído: '+r.titulo);toast('Ritual excluído!','info');render()};
+S.modal='confirm';render()};
 
 // Venda status
 window.moveVenda=function(id,dir){var v=getVenda(id);if(!v)return;var idx=STATUS_VENDA.findIndex(function(s){return s.key===v.status});var ni=idx+dir;if(ni>=0&&ni<STATUS_VENDA.length){v.status=STATUS_VENDA[ni].key;saveRecord('vendas',v.id,vendaToDB(v));addHistDB('Venda #'+id+' \u2192 '+vendaStatusLabel(v.status));render()}};
@@ -1086,7 +1322,7 @@ window.saveRastreio=function(){var v=getVenda(S.viewVendaId);if(v){v.codigoRastr
 // Consulente advance/revert
 window.getCons=getCons;
 window.openViewCons=function(id){S.editConsulente=getCons(id);S.modal='viewCons';render()};
-window.advanceCons=function(id){var c=getCons(id);if(!c)return;var idx=STATUS_FLUXO.findIndex(function(s){return s.key===c.statusFluxo});if(idx>=0&&idx<4){c.statusFluxo=STATUS_FLUXO[idx+1].key;saveRecord('consulentes',c.id,consToDB(c));addHistDB(c.nomeCompleto+' \u2192 '+statusLabel(c.statusFluxo));toast('Avançado!');render()}};
+window.advanceCons=function(id){var c=getCons(id);if(!c)return;var idx=STATUS_FLUXO.findIndex(function(s){return s.key===c.statusFluxo});if(idx>=0&&idx<5){c.statusFluxo=STATUS_FLUXO[idx+1].key;saveRecord('consulentes',c.id,consToDB(c));addHistDB(c.nomeCompleto+' \u2192 '+statusLabel(c.statusFluxo));toast('Avançado!');render()}};
 window.revertCons=function(id){var c=getCons(id);if(!c)return;var idx=STATUS_FLUXO.findIndex(function(s){return s.key===c.statusFluxo});if(idx>0){c.statusFluxo=STATUS_FLUXO[idx-1].key;saveRecord('consulentes',c.id,consToDB(c));addHistDB(c.nomeCompleto+' \u2190 '+statusLabel(c.statusFluxo));toast('Voltou!');render()}};
 window.openConfirmConsulta=function(id){S.editConsulente=getCons(id);S.modal='confirmConsulta';render()};
 window.confirmDelConsulta=function(id){var c=getCons(id);if(!c)return;S.confirmText='<strong>Excluir consulta de '+esc(c.nomeCompleto)+'?</strong><br>Esta ação é irreversível.';S.confirmAction=async function(){await deleteRecord('consulentes',c.id);S.consulentes=S.consulentes.filter(function(x){return x.id!==id});addHistDB('- Consulta excluída: '+c.nomeCompleto);toast('Consulta excluída!','info');render()};S.modal='confirm';render()};
@@ -1097,7 +1333,24 @@ window.confirmDelVenda=function(id){var v=getVenda(id);if(!v)return;var p=getPes
 window.openChangeConsPag=function(id){S.editConsulente=getCons(id);S.modal='changeConsPag';render()};
 window.doChangeConsPag=async function(){var c=S.editConsulente;if(!c)return;var ns=document.getElementById('mConsPagStatus').value;c.statusPagamento=ns;await saveRecord('consulentes',c.id,consToDB(c));addHistDB('Pagamento '+c.nomeCompleto+' → '+pagLabel(ns));toast('Pagamento atualizado!');closeModal();render()};
 
-window.salvarPrescricao=function(){var c=getCons(S.viewConsId);if(!c)return;c.oduResultado=document.getElementById('prOdu').value.trim();c.oduDescricao=document.getElementById('prOduDesc').value.trim();c.consideracoesGerais=document.getElementById('prConsGerais').value.trim();c.prescricaoRituais=document.getElementById('prRituais').value.trim();c.prescricaoMedicinas=document.getElementById('prMedicinas').value.trim();c.observacoesPrescricao=document.getElementById('prObs').value.trim();saveRecord('consulentes',c.id,consToDB(c));addHistDB('Prescrição: '+c.nomeCompleto);toast('Salva!')};
+window.salvarPrescricao=function(){var c=getCons(S.viewConsId);if(!c)return;c.oduResultado=document.getElementById('prOdu').value.trim();c.oduDescricao=document.getElementById('prOduDesc').value.trim();c.consideracoesGerais=document.getElementById('prConsGerais').value.trim();c.prescricaoRituais=document.getElementById('prRituais').value.trim();c.prescricaoMedicinas=document.getElementById('prMedicinas').value.trim();c.observacoesPrescricao=document.getElementById('prObs').value.trim();
+// Collect prescEbos from DOM
+var peArr=(S.prescEbos||[]).map(function(e,i){var t=document.getElementById('peTit'+i);var d=document.getElementById('peDesc'+i);var v=document.getElementById('peVal'+i);return {titulo:t?t.value.trim():(e.titulo||''),descricao:d?d.value.trim():(e.descricao||''),valor:v?(parseFloat(v.value)||0):(parseFloat(e.valor)||0)}}).filter(function(e){return e.titulo});
+c.prescricaoEbos=peArr;S.prescEbos=peArr.length?peArr:[{titulo:'',descricao:'',valor:0}];
+saveRecord('consulentes',c.id,consToDB(c));addHistDB('Prescrição: '+c.nomeCompleto+(peArr.length?' ('+peArr.length+' ebós)':''));toast('Salva!')};
+
+window.addPrescEbo=function(){
+S.prescEbos=S.prescEbos||[];
+// Persist DOM values
+S.prescEbos.forEach(function(e,i){var t=document.getElementById('peTit'+i);if(t)e.titulo=t.value;var d=document.getElementById('peDesc'+i);if(d)e.descricao=d.value;var v=document.getElementById('peVal'+i);if(v)e.valor=parseFloat(v.value)||0});
+S.prescEbos.push({titulo:'',descricao:'',valor:0});render()};
+
+window.removePrescEbo=function(i){
+if(!S.prescEbos)return;
+S.prescEbos.forEach(function(e,idx){var t=document.getElementById('peTit'+idx);if(t)e.titulo=t.value;var d=document.getElementById('peDesc'+idx);if(d)e.descricao=d.value;var v=document.getElementById('peVal'+idx);if(v)e.valor=parseFloat(v.value)||0});
+S.prescEbos.splice(i,1);
+if(!S.prescEbos.length)S.prescEbos=[{titulo:'',descricao:'',valor:0}];
+render()};
 
 // Crediário
 window.openAddCrediario=function(){S.modal='addCrediario';render()};
