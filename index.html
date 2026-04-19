@@ -440,11 +440,31 @@ function ritualFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,consulenteId:r.con
 // Save individual record - direct PATCH, no debounce
 // Columns that may not exist in the user's DB yet; stripped on retry if 400
 var _OPTIONAL_COLS={consulentes:['prescricao_ebos','prescricao_medicinas_itens','registro_pagamentos']};
+// Once detected as missing, skip preemptively (avoids spamming 400s)
+var _MISSING_COLS={};
+function _stripMissingCols(table,d){
+var missing=_MISSING_COLS[table]||[];
+missing.forEach(function(k){if(k in d)delete d[k]});
+return d}
+function _warnSchemaOnce(table,cols){
+if(_MISSING_COLS._warned&&_MISSING_COLS._warned[table])return;
+_MISSING_COLS._warned=_MISSING_COLS._warned||{};_MISSING_COLS._warned[table]=true;
+// Show a sticky banner
+try{
+var id='schemaMigrationBanner';
+if(document.getElementById(id))return;
+var div=document.createElement('div');
+div.id=id;
+div.style.cssText='position:fixed;top:0;left:0;right:0;background:#F39C12;color:#fff;padding:10px 20px;font-size:13px;font-weight:500;z-index:99999;box-shadow:0 2px 8px rgba(0,0,0,.15);display:flex;justify-content:space-between;align-items:center;gap:12px';
+div.innerHTML='<div>⚠ Migração SQL pendente no Supabase. Colunas faltando em <strong>'+table+'</strong>: '+cols.join(', ')+'. Rode o SQL no editor do Supabase para ativar Gestão de Itens.</div><button onclick="this.parentNode.remove()" style="background:rgba(255,255,255,.3);color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer">Ocultar</button>';
+document.body.appendChild(div);
+}catch(e){}}
 async function saveRecord(table,id,data){
 try{
 
   var d = Object.assign({}, data);
   delete d.id;
+  _stripMissingCols(table,d);
 
   var resp = await sbPatch(table,'?id=eq.'+id,d);
 
@@ -454,9 +474,10 @@ try{
     var stripped=[];
     _OPTIONAL_COLS[table].forEach(function(k){if(k in d2){stripped.push(k);delete d2[k]}});
     if(stripped.length){
-      console.warn('[schema] Retrying '+table+' save without columns:',stripped.join(', '),'— please run the SQL migration in Supabase');
+      console.warn('[schema] '+table+' is missing columns:',stripped.join(', '),'— caching and retrying. Please run the SQL migration in Supabase.');
+      _MISSING_COLS[table]=(_MISSING_COLS[table]||[]).concat(stripped.filter(function(k){return (_MISSING_COLS[table]||[]).indexOf(k)<0}));
+      _warnSchemaOnce(table,stripped);
       resp=await sbPatch(table,'?id=eq.'+id,d2);
-      if(resp.ok)toast('Salvo (sem: '+stripped.join(',')+'). Execute a migração SQL.','warn');
     }
   }
 
@@ -490,6 +511,7 @@ async function insertRecord(table,data){
 try{
   var d = Object.assign({}, data);
   delete d.id;
+  _stripMissingCols(table,d);
 
   var resp = await sbPost(table, d);
 
@@ -498,9 +520,10 @@ try{
     var stripped=[];
     _OPTIONAL_COLS[table].forEach(function(k){if(k in d2){stripped.push(k);delete d2[k]}});
     if(stripped.length){
-      console.warn('[schema] Retrying '+table+' insert without columns:',stripped.join(', '),'— please run the SQL migration in Supabase');
+      console.warn('[schema] '+table+' missing columns:',stripped.join(', '),'— caching and retrying. Please run the SQL migration.');
+      _MISSING_COLS[table]=(_MISSING_COLS[table]||[]).concat(stripped.filter(function(k){return (_MISSING_COLS[table]||[]).indexOf(k)<0}));
+      _warnSchemaOnce(table,stripped);
       resp=await sbPost(table,d2);
-      if(resp.ok)toast('Criado (sem: '+stripped.join(',')+'). Execute a migração SQL.','warn');
     }
   }
 
