@@ -819,6 +819,27 @@ function getConsForPessoa(pid){return S.consulentes.filter(function(c){return c.
 function getVendasForPessoa(pid){return S.vendas.filter(function(v){return v.pessoaId===pid})}
 function findByPhone(ph){if(!ph)return null;var c=ph.replace(/\D/g,'');return S.pessoas.find(function(p){return p.telefone&&p.telefone.replace(/\D/g,'')===c})}
 function daysDiff(d1,d2){return Math.floor((new Date(d2)-new Date(d1))/(86400000))}
+
+// Aniversariantes: retorna lista ordenada por proximidade dos próximos N dias (default 15)
+function getAniversariantes(diasAFrente){
+var n=diasAFrente||15;
+var hoje=new Date();hoje.setHours(0,0,0,0);
+var anoAtual=hoje.getFullYear();
+var resultado=[];
+S.pessoas.forEach(function(p){
+if(!p.dataNascimento)return;
+var parts=p.dataNascimento.split('-');if(parts.length!==3)return;
+var mes=parseInt(parts[1],10);var dia=parseInt(parts[2],10);
+if(!mes||!dia)return;
+// Próxima ocorrência do aniversário
+var prox=new Date(anoAtual,mes-1,dia);prox.setHours(0,0,0,0);
+if(prox<hoje)prox=new Date(anoAtual+1,mes-1,dia);
+var diffDias=Math.floor((prox-hoje)/86400000);
+if(diffDias>=0&&diffDias<=n){
+var idade=anoAtual-parseInt(parts[0],10);if(prox.getFullYear()>anoAtual)idade++;
+resultado.push({pessoa:p,dataNasc:p.dataNascimento,dia:dia,mes:mes,diasRestantes:diffDias,proxData:prox,idadeQueFara:idade})}});
+resultado.sort(function(a,b){return a.diasRestantes-b.diasRestantes});
+return resultado}
 function endCompleto(c){var parts=[];if(c.logradouro)parts.push(c.logradouro);if(c.numero)parts.push(c.numero);if(c.complemento)parts.push(c.complemento);if(c.bairro)parts.push(c.bairro);if(c.cidade)parts.push(c.cidade);if(c.estado)parts.push(c.estado);if(c.pais&&c.pais!=='Brasil')parts.push(c.pais);if(c.cep)parts.push('CEP: '+c.cep);return parts.join(', ')}
 
 function sendWhats(tipo,dados){console.log('[WHATSAPP '+WHATSAPP_DEST+'] '+tipo+': '+JSON.stringify(dados));S.notifications.push({tipo:tipo,nome:dados.Nome||'',time:new Date().toLocaleString('pt-BR'),msg:tipo+': '+(dados.Nome||'')})}
@@ -999,6 +1020,28 @@ h+='</div>';
 if(hasRole(['admin','babalawo','secretario'])){
 if(delAlerts.length){h+='<div class="chart-container" style="border-left:4px solid var(--warning)"><div class="chart-title" style="color:var(--warning)">Alertas de Exclusão</div>';delAlerts.slice(0,10).forEach(function(a){h+='<div style="padding:6px 10px;margin-bottom:4px;border-radius:6px;background:var(--warning-bg);font-size:13px">'+esc(a.msg)+' \u2022 '+esc(a.time)+'</div>'});h+='</div>'}
 if(alerts.length){h+='<div class="chart-container" style="border-left:4px solid var(--danger)"><div class="chart-title" style="color:var(--danger)">Prescrições Pendentes</div>';alerts.forEach(function(a){h+='<div style="padding:6px 10px;margin-bottom:4px;border-radius:6px;background:'+(a.level==='danger'?'var(--danger-bg)':'var(--warning-bg)')+';display:flex;align-items:center;justify-content:space-between">'+esc(a.consulente.nomeCompleto)+' - '+a.dias+'d <button class="btn btn-sm btn-warning" onclick="goPrescrPage('+a.consulente.id+')">Prescrever</button></div>'});h+='</div>'}
+// Aniversariantes próximos 15 dias
+var anivs=getAniversariantes(15);
+if(anivs.length){
+h+='<div class="chart-container" style="border-left:4px solid #E91E63"><div class="chart-title" style="color:#E91E63">\uD83C\uDF82 Aniversariantes \u2014 Próximos 15 dias ('+anivs.length+')</div>';
+h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px">';
+anivs.forEach(function(a){
+var p=a.pessoa;
+var quando=a.diasRestantes===0?'HOJE':a.diasRestantes===1?'Amanhã':'Em '+a.diasRestantes+' dias';
+var destaque=a.diasRestantes<=1?'background:#FCE4EC;border:1.5px solid #E91E63':'background:var(--bg);border:1px solid var(--border2)';
+var dataFmt=String(a.dia).padStart(2,'0')+'/'+String(a.mes).padStart(2,'0');
+var tel=p.telefone||'';
+var whatsMsg=encodeURIComponent('Olá '+p.nome+'! 🎂 Parabéns pelo seu aniversário! Que esse novo ciclo seja abençoado e próspero. — Ilé Ifagbemi Brasil');
+var whatsLink=tel?'https://wa.me/'+tel.replace(/\D/g,'')+'?text='+whatsMsg:'';
+h+='<div style="'+destaque+';border-radius:var(--radius);padding:10px;display:flex;gap:10px;align-items:center">';
+h+='<div style="width:40px;height:40px;border-radius:50%;background:#E91E63;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0">'+esc((p.nome||'?')[0].toUpperCase())+'</div>';
+h+='<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.nome)+'</div>';
+h+='<div style="font-size:11px;color:var(--text2)">'+dataFmt+' \u2022 faz '+a.idadeQueFara+' anos \u2022 <strong style="color:#E91E63">'+quando+'</strong></div></div>';
+h+='<div style="display:flex;gap:4px">';
+if(whatsLink)h+='<a href="'+whatsLink+'" target="_blank" class="btn btn-sm btn-success" style="font-size:11px;padding:4px 8px" title="Parabenizar via WhatsApp">WhatsApp</a>';
+h+='<button class="btn btn-sm btn-outline" style="font-size:11px;padding:4px 8px" onclick="goPerfil('+p.id+')">Ver</button>';
+h+='</div></div>'});
+h+='</div></div>'}
 if(S.notifications.length){h+='<div class="chart-container"><div class="chart-title">Notificações Recentes</div>';S.notifications.slice(0,5).forEach(function(n){h+='<div style="padding:4px 10px;margin-bottom:3px;font-size:12px;color:var(--text2)">'+esc(n.tipo)+': '+esc(n.nome)+' \u2022 '+esc(n.time)+'</div>'});h+='</div>'}
 }
 // Kanban
@@ -1036,7 +1079,9 @@ k+='<button class="btn btn-sm btn-info" onclick="openConfirmConsulta('+c.id+')">
 k+='<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="confirmDelConsulta('+c.id+')">Excluir</button>';
 k+='<button class="btn btn-sm btn-outline" style="color:var(--warning);border-color:var(--warning)" onclick="concluirCicloConsulta('+c.id+')">Concluir Ciclo</button>'}
 if(s.key==='aguardando_prescricao')k+='<button class="btn btn-sm btn-warning" onclick="goPrescrPage('+c.id+')">Prescrição</button>';
-if(st.temItens)k+='<button class="btn btn-sm btn-purple" onclick="openGestaoItens('+c.id+')">Gestão</button>';
+if(s.key==='aguardando_decisao'&&st.temItens)k+='<button class="btn btn-sm btn-purple" onclick="openGestaoItens('+c.id+')" style="font-weight:700">Decidir Itens</button>';
+else if(st.temItens)k+='<button class="btn btn-sm btn-purple" onclick="openGestaoItens('+c.id+')">Gestão</button>';
+if((s.key==='aguardando_ebo'||s.key==='ebo_em_andamento'||s.key==='aguardando_decisao')&&st.temItens)k+='<button class="btn btn-sm btn-outline" onclick="goPrescrPage('+c.id+')">Prescrição</button>';
 if(s.key==='aguardando_ebo'||s.key==='ebo_em_andamento')k+='<button class="btn btn-sm btn-info" onclick="gerarEbo(getCons('+c.id+'))">Ebó PDF</button>';
 if(s.key==='arquivado')k+='<button class="btn btn-sm btn-info" onclick="retomarCiclo('+c.id+')">Retomar</button>';
 k+='<button class="btn btn-sm btn-outline" onclick="openChangeConsPag('+c.id+')">Pag.</button>';
