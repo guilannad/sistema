@@ -163,7 +163,21 @@ tr:hover td{background:var(--accent-bg)}
 .currency-wrap{position:relative}
 .currency-wrap input{padding-left:36px!important}
 .st-aguardando_ebo_ritual{background:#FDE8D0;color:#CA6F1E}
-@media print{body *{visibility:hidden}#eboSheet,#eboSheet *{visibility:visible}#eboSheet{position:fixed;top:0;left:0;width:100vw;height:100vh;background:#fff;z-index:9999}#eboSheet .ebo-page{width:100%;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;page-break-after:always}#eboSheet .ebo-page:last-child{page-break-after:auto}#eboSheet .ebo-nome{font-size:72px;font-weight:700;text-align:center;margin-bottom:16px}#eboSheet .ebo-mae{font-size:36px;font-weight:700;text-align:center;margin-bottom:12px}#eboSheet .ebo-nasc{font-size:28px;font-weight:700;text-align:center;margin-bottom:12px}#eboSheet .ebo-local{font-size:24px;font-weight:700;text-align:center}#eboSheet .ebo-fotos{display:flex;gap:20px;align-items:center;justify-content:center;width:100%;height:100%}#eboSheet .ebo-foto-box{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px}#eboSheet .ebo-foto-img{max-width:100%;max-height:80vh;object-fit:contain;filter:grayscale(100%) contrast(1.05);border:1px solid #000}#eboSheet .ebo-foto-cap{font-size:20px;font-weight:700;margin-top:12px;text-align:center;color:#000}@page{size:landscape;margin:1cm}}
+@media print{
+body *{visibility:hidden}
+#eboSheet,#eboSheet *{visibility:visible}
+#eboSheet{position:fixed;top:0;left:0;width:100vw;height:100vh;background:#fff;z-index:9999;margin:0;padding:0}
+#eboSheet .ebo-page{width:100%;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;page-break-after:always;break-after:page;margin:0;padding:0;box-sizing:border-box}
+#eboSheet .ebo-page:last-child{page-break-after:auto;break-after:auto}
+#eboSheet .ebo-nome{font-size:72px;font-weight:700;text-align:center;margin-bottom:16px}
+#eboSheet .ebo-mae{font-size:36px;font-weight:700;text-align:center;margin-bottom:12px}
+#eboSheet .ebo-nasc{font-size:28px;font-weight:700;text-align:center;margin-bottom:12px}
+#eboSheet .ebo-local{font-size:24px;font-weight:700;text-align:center}
+#eboSheet .ebo-fotos{display:flex;gap:0;width:100%;height:100%;margin:0;padding:0}
+#eboSheet .ebo-foto-box{flex:1 1 50%;display:flex;align-items:center;justify-content:center;padding:0;margin:0;overflow:hidden}
+#eboSheet .ebo-foto-img{width:100%;height:100%;object-fit:cover;filter:grayscale(100%) contrast(1.05);display:block}
+@page{size:A4 landscape;margin:0}
+}
 @media(max-width:600px){.header{flex-direction:column;gap:8px;text-align:center}.search-bar{flex-direction:column}.tab{padding:8px 10px;font-size:12px}.report-cards{grid-template-columns:1fr 1fr}.modal{padding:20px 16px}.bar-chart{height:160px}.kanban-grid{grid-template-columns:1fr}.form-group-row{grid-template-columns:1fr}.detail-grid{grid-template-columns:1fr}.quick-bar{justify-content:center}}
 </style>
 </head>
@@ -251,7 +265,7 @@ var STATUS_PAG=['pendente','50_pago','pago'];
 var ORIGENS=['instagram','tiktok','youtube','facebook','google','indicacao','loja_online','direto','whatsapp'];
 var FORMATOS=['presencial','online'];
 var TIPO_INTERACAO=['compra_magia','consulta','prescricao','ebo','pagamento','observacao'];
-var TIPO_FRETE=['sedex','pac','uber_envios','99','retirada','outro'];
+var TIPO_FRETE=['a_definir','sedex','pac','uber_envios','99','retirada','outro'];
 var WHATSAPP_DEST='+5531989075427';
 
 function tipoClass(t){return 'tipo-'+t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z]/g,'')}
@@ -260,7 +274,7 @@ function vendaStatusLabel(k){var s=STATUS_VENDA.find(function(x){return x.key===
 function pagLabel(k){return k==='pendente'?'Pendente':k==='50_pago'?'50% Pago':k==='pago'?'Pago':k}
 function interLabel(k){return{compra_magia:'Compra/Magia',consulta:'Consulta',prescricao:'Prescrição',ebo:'Ebó',pagamento:'Pagamento',observacao:'Observação'}[k]||k}
 function cicloStatusLabel(k){return{ativo:'Ativo',concluido:'Concluído',cancelado:'Cancelado'}[k]||k}
-function freteLabel(k){return{sedex:'Sedex',pac:'PAC',uber_envios:'Uber Envios','99':'99',retirada:'Retirada',outro:'Outro'}[k]||k}
+function freteLabel(k){return{a_definir:'A definir',sedex:'Sedex',pac:'PAC',uber_envios:'Uber Envios','99':'99',retirada:'Retirada',outro:'Outro'}[k]||k}
 
 // ==================== STATE ====================
 var S={
@@ -858,10 +872,9 @@ var renderSheet=function(imgSrc){
 var el=document.getElementById('eboSheet');
 // Page 1 — existing content (name, mother, birth, location)
 var page1='<div class="ebo-page"><div class="ebo-nome">'+esc(c.nomeCompleto)+'</div><div class="ebo-mae">Mãe: '+esc(c.nomeMae||'')+'</div><div class="ebo-nasc">'+fmtDate(c.dataNascimento)+'</div><div class="ebo-local">'+esc((c.cidade||'')+' - '+(c.pais||''))+'</div></div>';
-// Page 2 — duas fotos lado a lado para impressão P&B
-var cap='<div class="ebo-foto-cap">'+esc(c.nomeCompleto)+'</div>';
-var foto1='<div class="ebo-foto-box"><img class="ebo-foto-img" src="'+imgSrc+'" alt="Foto">'+cap+'</div>';
-var foto2='<div class="ebo-foto-box"><img class="ebo-foto-img" src="'+imgSrc+'" alt="Foto">'+cap+'</div>';
+// Page 2 — duas fotos lado a lado ocupando toda a folha (sem texto)
+var foto1='<div class="ebo-foto-box"><img class="ebo-foto-img" src="'+imgSrc+'" alt="Foto"></div>';
+var foto2='<div class="ebo-foto-box"><img class="ebo-foto-img" src="'+imgSrc+'" alt="Foto"></div>';
 var page2='<div class="ebo-page"><div class="ebo-fotos">'+foto1+foto2+'</div></div>';
 el.innerHTML=page1+(imgSrc?page2:'');
 el.style.display='block';
@@ -1135,13 +1148,16 @@ var h='<div class="report-cards">';STATUS_VENDA.forEach(function(s){h+='<div cla
 h+='<div class="kanban-grid">';STATUS_VENDA.forEach(function(s){
 h+='<div class="kanban-col"><div class="kanban-header">'+esc(s.label)+'<span class="kanban-count">'+bv[s.key].length+'</span></div>';
 bv[s.key].forEach(function(v){var p=getPessoa(v.pessoaId);
-h+='<div class="kanban-card" style="border-left-color:'+s.color+'"><h4>#'+v.id+' '+esc(p?p.nome:'')+'</h4><div class="kc-sub">'+fmtDate(v.data)+' \u2022 R$'+(v.totalComFrete||0).toFixed(2)+' \u2022 '+freteLabel(v.tipoFrete||'')+'</div>';
+var freteIndefinido=!v.tipoFrete||v.tipoFrete==='a_definir'||v.tipoFrete===''||(!v.valorFrete&&v.tipoFrete!=='retirada');
+h+='<div class="kanban-card" style="border-left-color:'+s.color+(freteIndefinido&&s.key!=='cancelado'&&s.key!=='concluido'?';box-shadow:inset 0 0 0 1px #F39C12':'')+'"><h4>#'+v.id+' '+esc(p?p.nome:'')+'</h4><div class="kc-sub">'+fmtDate(v.data)+' \u2022 R$'+(v.totalComFrete||0).toFixed(2)+' \u2022 '+freteLabel(v.tipoFrete||'a_definir')+'</div>';
+if(freteIndefinido&&s.key!=='cancelado'&&s.key!=='concluido')h+='<div style="background:#FEF5E7;color:#B9770E;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:600;margin-bottom:4px;display:inline-block">\u26A0 Frete a definir</div>';
 if(v.itens)v.itens.forEach(function(it){h+='<div style="font-size:11px;color:var(--text2)">'+it.qtd+'x '+esc(it.nome)+' R$'+it.valorTotal.toFixed(2)+'</div>'});
 if(v.codigoRastreio)h+='<div style="font-size:11px;margin-top:4px"><strong>Rastreio:</strong> '+esc(v.codigoRastreio)+'</div>';
 h+='<div class="kc-actions">';
 var vi=STATUS_VENDA.findIndex(function(x){return x.key===s.key});
 if(vi>0&&s.key!=='cancelado')h+='<button class="btn btn-sm btn-outline" onclick="moveVenda('+v.id+',-1)">\u25C0</button>';
 if(vi<3&&s.key!=='concluido'&&s.key!=='cancelado')h+='<button class="btn btn-sm btn-success" onclick="moveVenda('+v.id+',1)">Avançar</button>';
+if(freteIndefinido&&s.key!=='cancelado'&&s.key!=='concluido')h+='<button class="btn btn-sm" style="background:#F39C12;color:#fff" onclick="openDefinirFrete('+v.id+')">Definir Frete</button>';
 if(s.key==='embalando')h+='<button class="btn btn-sm btn-info" onclick="addRastreio('+v.id+')">Rastreio</button>';
 h+='<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="confirmDelVenda('+v.id+')">Excluir</button>';
 h+='</div></div>'});h+='</div>'});h+='</div>';
@@ -1298,7 +1314,7 @@ if(m==='flowConsulta')return mFlowConsulta();
 if(m==='flowRitual')return mFlowRitual();
 if(m==='gestaoItens')return mGestaoItens();
 if(m==='addCiclo')return mAddCiclo();if(m==='addInter'||m==='editInter')return mInter();
-if(m==='rastreio')return mRastreio();if(m==='confirmConsulta')return mConfirmConsulta();if(m==='changeConsPag')return mChangeConsPag();
+if(m==='rastreio')return mRastreio();if(m==='definirFrete')return mDefinirFrete();if(m==='confirmConsulta')return mConfirmConsulta();if(m==='changeConsPag')return mChangeConsPag();
 if(m==='addCrediario')return mAddCrediario();if(m==='pagCrediario')return mPagCrediario();
 if(m==='addLivro'||m==='editLivro')return mLivro();
 return ''}
@@ -1418,8 +1434,16 @@ var kindLabel=it.kind==='ebo'?'Ebó':'Medicina';
 var aceitoBadge=it.aceito===true?'<span style="background:#E8F8F0;color:#1E8449;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600">ACEITO</span>':it.aceito===false?'<span style="background:#FDEDEC;color:#C0392B;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600">RECUSADO</span>':'<span style="background:#F5ECD4;color:#8B6914;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600">AGUARDA DECISÃO</span>';
 var statusBadge=it.aceito===true?'<span style="background:var(--bg2);color:var(--text2);padding:2px 8px;border-radius:6px;font-size:11px">'+itemStatusLabel(it.status)+'</span>':'';
 var pagPct=it.valor>0?Math.min(100,(it.valorPago/it.valor)*100):0;
-var out='<div style="background:var(--bg);border:1.5px solid var(--border);border-left:4px solid '+kindColor+';border-radius:var(--radius);padding:12px;margin-bottom:10px">';
-out+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><div style="font-size:11px;font-weight:700;color:'+kindColor+';letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">'+kindLabel+' \u00b7 R$ '+it.valor.toFixed(2).replace('.',',')+'</div><div style="font-weight:600;font-size:14px;line-height:1.3">'+esc(it.titulo)+'</div>'+(it.descricao?'<div style="font-size:12px;color:var(--text2);margin-top:3px">'+esc(it.descricao.substring(0,140))+(it.descricao.length>140?'...':'')+'</div>':'')+'</div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">'+aceitoBadge+statusBadge+'</div></div>';
+// Checkbox só em medicinas aceitas sem venda vinculada e não arquivadas
+var canSelect=it.kind==='medicina'&&it.aceito===true&&!it.vendaId&&it.status!=='arquivado';
+var isSelected=canSelect&&(S.gestaoMedicinasSel||{})[it.id];
+var out='<div style="background:var(--bg);border:1.5px solid '+(isSelected?'#00695C':'var(--border)')+';border-left:4px solid '+kindColor+';border-radius:var(--radius);padding:12px;margin-bottom:10px'+(isSelected?';box-shadow:0 0 0 2px rgba(0,105,92,.2)':'')+'">';
+out+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px;flex-wrap:wrap">';
+out+='<div style="flex:1;min-width:200px;display:flex;gap:8px;align-items:flex-start">';
+if(canSelect)out+='<input type="checkbox" onchange="toggleMedicinaSel(\''+it.id+'\')" '+(isSelected?'checked':'')+' style="margin-top:4px;width:18px;height:18px;cursor:pointer;accent-color:#00695C" title="Incluir no pedido agrupado">';
+out+='<div style="flex:1"><div style="font-size:11px;font-weight:700;color:'+kindColor+';letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">'+kindLabel+' \u00b7 R$ '+it.valor.toFixed(2).replace('.',',')+'</div><div style="font-weight:600;font-size:14px;line-height:1.3">'+esc(it.titulo)+'</div>'+(it.descricao?'<div style="font-size:12px;color:var(--text2);margin-top:3px">'+esc(it.descricao.substring(0,140))+(it.descricao.length>140?'...':'')+'</div>':'')+'</div>';
+out+='</div>';
+out+='<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">'+aceitoBadge+statusBadge+'</div></div>';
 // Pagamento
 if(it.aceito===true){
 out+='<div style="background:var(--bg2);border-radius:6px;padding:8px;margin:6px 0;font-size:12px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Pago:</span><strong>R$ '+it.valorPago.toFixed(2).replace('.',',')+' / R$ '+it.valor.toFixed(2).replace('.',',')+'</strong></div><div style="height:6px;background:var(--border2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pagPct+'%;background:'+(pagPct>=100?'var(--success)':pagPct>0?'var(--warning)':'var(--border2)')+';transition:width .3s"></div></div></div>'}
@@ -1434,7 +1458,6 @@ if(it.status==='pendente')out+='<button class="btn btn-sm btn-info" onclick="ava
 if(it.status==='em_andamento')out+='<button class="btn btn-sm btn-success" onclick="avancarItem(\''+it.kind+'\',\''+it.id+'\',\'concluido\')">Concluir</button>';
 if(it.status==='concluido')out+='<button class="btn btn-sm btn-outline" onclick="avancarItem(\''+it.kind+'\',\''+it.id+'\',\'em_andamento\')">Reabrir</button>';
 out+='<button class="btn btn-sm btn-outline" onclick="editarValorPagoItem(\''+it.kind+'\',\''+it.id+'\')">Valor pago</button>';
-if(it.kind==='medicina'&&!it.vendaId&&it.status!=='arquivado')out+='<button class="btn btn-sm" style="background:#00695C;color:#fff" onclick="gerarVendaDeMedicina(\''+it.id+'\')">Gerar venda</button>';
 if(it.vendaId)out+='<button class="btn btn-sm btn-outline" onclick="goPerfilFromVenda('+it.vendaId+')">Ver venda #'+it.vendaId+'</button>';
 }
 if(it.status!=='arquivado')out+='<button class="btn btn-sm btn-outline" style="color:var(--text3)" onclick="arquivarItem(\''+it.kind+'\',\''+it.id+'\')">Arquivar</button>';
@@ -1476,6 +1499,24 @@ var active=tab===t[0];
 h+='<button onclick="S.gestaoTab=\''+t[0]+'\';render()" style="background:none;border:none;padding:8px 14px;cursor:pointer;font-weight:'+(active?'700':'500')+';color:'+(active?'var(--accent)':'var(--text2)')+';border-bottom:'+(active?'2px':'0')+' solid var(--accent);margin-bottom:-2px">'+t[1]+'</button>'});
 h+='</div>';
 
+// Pedido agrupado de medicinas aceitas (bar de ação)
+var medsSelecionaveis=st.aceitosMeds.filter(function(m){return !m.vendaId&&m.status!=='arquivado'});
+if(medsSelecionaveis.length){
+var sel=S.gestaoMedicinasSel||{};
+var selecionadas=medsSelecionaveis.filter(function(m){return sel[m.id]});
+var totalSel=selecionadas.reduce(function(a,b){return a+b.valor},0);
+h+='<div style="background:#E0F2F1;border:1.5px solid #00695C;border-radius:var(--radius);padding:12px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center">';
+h+='<div><div style="font-weight:700;color:#00695C;font-size:13px">📦 Pedido de Medicinas</div>';
+h+='<div style="font-size:12px;color:var(--text2);margin-top:2px">Marque as medicinas para enviar em um pedido único. Medicinas já vinculadas a vendas não aparecem aqui.</div></div>';
+h+='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">';
+if(medsSelecionaveis.length>1){
+var allSel=selecionadas.length===medsSelecionaveis.length;
+h+='<button class="btn btn-sm btn-outline" onclick="selecionarTodasMedicinas('+(allSel?'false':'true')+')">'+(allSel?'Desmarcar todas':'Selecionar todas')+'</button>'}
+if(selecionadas.length>0){
+h+='<span style="font-size:12px;color:var(--text2)">'+selecionadas.length+' selecionada(s) • R$'+totalSel.toFixed(2).replace('.',',')+'</span>';
+h+='<button class="btn btn-sm" style="background:#00695C;color:#fff;font-weight:700" onclick="gerarPedidoAgrupado()">Gerar Pedido ('+selecionadas.length+')</button>'}
+h+='</div></div>'}
+
 // Items
 if(!items.length){
 h+='<div style="text-align:center;padding:40px;color:var(--text3)">Nenhum item nesta categoria.</div>'}
@@ -1503,6 +1544,25 @@ function mConfirm(){return '<div class="modal-overlay"><div class="modal"><div s
 function mConfirmConsulta(){var c=S.editConsulente;if(!c)return '';var tl=(c.tipoConsulta==='urgencia')?'Urgência':'Normal';var fl={'pix_avista':'PIX à vista','pix_50_50':'PIX 50%+50%','link_mercadopago':'Link Mercado Pago','cartao':'Cartão'}[c.formaPagamento]||c.formaPagamento||'';var pt=c.statusPagamento==='pago'?'Efetuado':'Pendente';var wt='*Confirmação de consulta*\n'+c.nomeCompleto+'\n'+(c.nomeMae?'filho(a) de '+c.nomeMae+'\n':'')+(c.dataNascimento?'Nascido(a) em '+fmtDate(c.dataNascimento)+'\n':'')+'Data da consulta: '+fmtDate(c.dataConsulta)+'\n'+(c.horarioConsulta?'Horário: '+c.horarioConsulta+'\n':'')+(c.formatoConsulta?'Formato: '+c.formatoConsulta+'\n':'')+'Modalidade: '+tl+'\nValor: R$'+(c.valorCobrado||0).toFixed(2)+'\nPagamento: '+pt+(fl?' via '+fl:'')+'.';return '<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal modal-wide"><h3>Confirmar Consulta</h3><div class="detail-grid"><div><div class="dl">Consulente</div><div class="dv">'+esc(c.nomeCompleto)+'</div></div><div><div class="dl">Mãe</div><div class="dv">'+esc(c.nomeMae||'—')+'</div></div><div><div class="dl">Nascimento</div><div class="dv">'+fmtDate(c.dataNascimento)+'</div></div><div><div class="dl">Data Consulta</div><div class="dv">'+fmtDate(c.dataConsulta)+'</div></div><div><div class="dl">Horário</div><div class="dv">'+esc(c.horarioConsulta||'—')+'</div></div><div><div class="dl">Formato</div><div class="dv">'+esc(c.formatoConsulta||'—')+'</div></div><div><div class="dl">Modalidade</div><div class="dv">'+tl+'</div></div><div><div class="dl">Valor Cobrado</div><div class="dv">R$'+(c.valorCobrado||0).toFixed(2)+'</div></div><div><div class="dl">Valor Recebido</div><div class="dv">R$'+(c.valorRecebido||0).toFixed(2)+'</div></div><div><div class="dl">Pagamento</div><div class="dv"><span class="pag-badge pag-'+c.statusPagamento+'">'+pagLabel(c.statusPagamento)+'</span></div></div><div><div class="dl">Telefone</div><div class="dv">'+esc(c.telefoneWhatsApp||'—')+'</div></div></div><div style="margin-top:16px"><div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;margin-bottom:6px">Texto para WhatsApp (clique para copiar)</div><div id="whatsConfirmText" onclick="copyWhatsConfirm()" style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;font-size:13px;line-height:1.7;white-space:pre-wrap;cursor:pointer">'+esc(wt)+'</div><div id="copyFeedback" style="font-size:11px;color:var(--success);margin-top:4px;opacity:0;transition:opacity .3s">✔ Copiado!</div></div><div style="background:var(--success-bg);padding:12px;border-radius:var(--radius);margin-top:16px;font-size:13px;color:var(--success)">Ao confirmar, o status será alterado para <strong>Aguardando Prescrição</strong>.</div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-success" onclick="doConfirmConsulta()">Confirmar Consulta</button></div></div></div>'}
 function mChangeConsPag(){var c=S.editConsulente;if(!c)return '';var opts=STATUS_PAG.map(function(sp){return '<option value="'+sp+'"'+(c.statusPagamento===sp?' selected':'')+'>'+pagLabel(sp)+'</option>'}).join('');return '<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal"><h3>Alterar Pagamento</h3><div style="font-size:14px;margin-bottom:12px">'+esc(c.nomeCompleto)+' — R$'+(c.valorCobrado||0).toFixed(2)+'</div><div class="form-group"><label>Status de Pagamento</label><select id="mConsPagStatus">'+opts+'</select></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="doChangeConsPag()">Salvar</button></div></div></div>'}
 function mRastreio(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Código de Rastreio</h3><div class="form-group"><label>Código</label><input id="mRastreio"></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveRastreio()">Salvar</button></div></div></div>'}
+
+function mDefinirFrete(){
+var v=getVenda(S.viewVendaId);if(!v)return '';
+var p=getPessoa(v.pessoaId);
+var enderecoLinhas=[];
+if(p){
+if(p.logradouro)enderecoLinhas.push(p.logradouro+(p.numero?', '+p.numero:'')+(p.complemento?' \u2014 '+p.complemento:''));
+if(p.bairro)enderecoLinhas.push(p.bairro);
+if(p.cidade||p.estado)enderecoLinhas.push((p.cidade||'')+(p.estado?' - '+p.estado:''));
+if(p.cep)enderecoLinhas.push('CEP: '+p.cep);
+if(p.pais&&p.pais!=='Brasil')enderecoLinhas.push(p.pais)}
+var tipoAtual=v.tipoFrete||'a_definir';
+var opts=TIPO_FRETE.filter(function(f){return f!=='a_definir'}).map(function(f){return '<option value="'+f+'"'+(tipoAtual===f?' selected':'')+'>'+freteLabel(f)+'</option>'}).join('');
+return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Definir Frete \u2014 Pedido #'+v.id+'</h3>'+
+'<div style="background:var(--bg2);padding:10px;border-radius:var(--radius);margin-bottom:12px;font-size:13px"><strong>'+esc(p?p.nome:'')+'</strong><br>'+(enderecoLinhas.length?enderecoLinhas.map(esc).join('<br>'):'<em style="color:var(--text3)">Endereço não cadastrado</em>')+'</div>'+
+'<div class="form-group"><label>Tipo de frete</label><select id="dfTipo">'+opts+'</select></div>'+
+'<div class="form-group"><label>Valor do frete</label>'+currencyInput('dfValor',parseFloat(v.valorFrete)||0,'0,00','')+'</div>'+
+'<div style="font-size:11px;color:var(--text2);margin-bottom:12px">O valor será somado ao subtotal do pedido. Escolha <strong>Retirada</strong> se o cliente for buscar pessoalmente (valor = 0).</div>'+
+'<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveDefinirFrete()">Salvar</button></div></div></div>'}
 function mAddCrediario(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Novo Crediário</h3><div class="form-group"><label>Cliente</label><select id="crCliente">'+S.pessoas.map(function(p){return '<option value="'+p.id+'">'+esc(p.nome)+'</option>'}).join('')+'</select></div><div class="form-group"><label>Descrição</label><textarea id="crDesc" rows="2"></textarea></div><div class="form-group"><label>Valor Total</label>'+currencyInput('crValor',0,'0,00','')+'</div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveCrediario()">Criar</button></div></div></div>'}
 function mPagCrediario(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Pagamento</h3><div class="form-group"><label>Valor</label>'+currencyInput('pgVal',0,'0,00','')+'</div><div class="form-group"><label>Forma</label><select id="pgForma"><option>pix</option><option>cartao</option><option>dinheiro</option><option>transferencia</option></select></div><div class="form-group"><label>Comprovante</label><input type="file" id="pgComp" accept="image/*"></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="savePagCrediario()">Registrar</button></div></div></div>'}
 
@@ -1689,7 +1749,7 @@ S.confirmAction=async function(){await deleteRecord('rituais',r.id);S.rituais=S.
 S.modal='confirm';render()};
 
 // ============ GESTÃO DE ITENS DE PRESCRIÇÃO ============
-window.openGestaoItens=function(id){S.gestaoConsId=id;S.gestaoTab='todos';S.modal='gestaoItens';render()};
+window.openGestaoItens=function(id){S.gestaoConsId=id;S.gestaoTab='todos';S.gestaoMedicinasSel={};S.modal='gestaoItens';render()};
 
 // Find & mutate an item by kind+id in the cons object
 function _findItem(c,kind,id){
@@ -1721,6 +1781,10 @@ c.prescricaoMedicinasItens=meds}
 window.decidirItem=async function(kind,id,aceito){
 var c=getCons(S.gestaoConsId);if(!c)return;
 var f=_findItem(c,kind,id);if(!f)return;
+// Se medicina com venda vinculada está sendo recusada, avisa o usuário
+if(!aceito&&kind==='medicina'&&f.item.vendaId){
+if(!confirm('Esta medicina já tem uma venda vinculada (#'+f.item.vendaId+'). Ao recusar, o vínculo será removido mas a venda permanecerá na esteira de envios.\n\nVocê precisará cancelar ou gerenciar a venda manualmente na aba Vendas. Deseja continuar?'))return;
+f.item.vendaId=null}
 f.item.aceito=aceito;
 f.item.dataDecisao=today();
 if(!aceito){f.item.status='arquivado'}
@@ -1840,29 +1904,86 @@ await saveRecord('consulentes',c.id,consToDB(c));
 toast('Ciclo finalizado!');
 closeModal()};
 
-window.gerarVendaDeMedicina=async function(itemId){
+window.toggleMedicinaSel=function(itemId){
+S.gestaoMedicinasSel=S.gestaoMedicinasSel||{};
+if(S.gestaoMedicinasSel[itemId])delete S.gestaoMedicinasSel[itemId];
+else S.gestaoMedicinasSel[itemId]=true;
+render()};
+
+window.selecionarTodasMedicinas=function(marcar){
 var c=getCons(S.gestaoConsId);if(!c)return;
-var f=_findItem(c,'medicina',itemId);if(!f)return;
+var st=consStats(c);
+S.gestaoMedicinasSel=S.gestaoMedicinasSel||{};
+st.aceitosMeds.forEach(function(m){
+if(m.vendaId||m.status==='arquivado')return;
+if(marcar)S.gestaoMedicinasSel[m.id]=true;
+else delete S.gestaoMedicinasSel[m.id]});
+render()};
+
+window.gerarPedidoAgrupado=async function(){
+var c=getCons(S.gestaoConsId);if(!c)return;
 var p=c.pessoaId?getPessoa(c.pessoaId):null;
 if(!p)return toast('Cliente não encontrado','error');
-if(f.item.vendaId){
-// Sanity check: se o vendaId gravado aponta para venda inexistente (fantasma), limpa
-var exists=S.vendas.find(function(v){return v.id===f.item.vendaId});
-if(!exists){console.warn('Limpando vendaId fantasma:',f.item.vendaId);f.item.vendaId=null;_writeBack(c,'medicina',f.arr)}
-else return toast('Esta medicina já possui venda vinculada (#'+f.item.vendaId+')','info')}
-// Create venda
-var nv={id:0,pessoaId:p.id,data:today(),itens:[{nome:f.item.titulo,qtd:1,valorUnit:f.item.valor,valorTotal:f.item.valor}],tipoFrete:'pac',valorFrete:0,subtotal:f.item.valor,totalComFrete:f.item.valor,status:'pedido_feito',formaPagamento:'',codigoRastreio:'',comprovante:'',observacoes:'Gerada da prescrição \u2014 '+c.nomeCompleto};
+var sel=S.gestaoMedicinasSel||{};
+var meds=normalizeItems(c.prescricaoMedicinasItens,'medicina');
+var selecionadas=meds.filter(function(m){return sel[m.id]&&m.aceito===true&&!m.vendaId&&m.status!=='arquivado'});
+if(!selecionadas.length)return toast('Selecione ao menos 1 medicina para gerar o pedido','error');
+// Monta venda com múltiplos itens
+var itensVenda=selecionadas.map(function(m){return {nome:m.titulo,qtd:1,valorUnit:m.valor,valorTotal:m.valor}});
+var subtotal=selecionadas.reduce(function(a,b){return a+b.valor},0);
+var nv={id:0,pessoaId:p.id,data:today(),itens:itensVenda,tipoFrete:'a_definir',valorFrete:0,subtotal:subtotal,totalComFrete:subtotal,status:'pedido_feito',formaPagamento:'',codigoRastreio:'',comprovante:'',observacoes:'Pedido agrupado de '+selecionadas.length+' medicina(s) \u2014 '+c.nomeCompleto};
 var dbv=await insertRecord('vendas',vendaToDB(nv));
-if(!dbv||!dbv.id){toast('Falha ao criar venda. Nenhuma alteração gravada.','error');return}
+if(!dbv||!dbv.id){toast('Falha ao criar pedido. Nenhuma alteração gravada.','error');return}
 nv.id=dbv.id;
 S.vendas.push(nv);
-f.item.vendaId=nv.id;
-f.item.status='em_andamento';
-_writeBack(c,'medicina',f.arr);
+// Vincula vendaId em todas as medicinas selecionadas
+selecionadas.forEach(function(m){
+var idx=meds.findIndex(function(x){return x.id===m.id});
+if(idx>=0){meds[idx].vendaId=nv.id;meds[idx].status='em_andamento'}});
+c.prescricaoMedicinasItens=meds;
 c.statusFluxo=deriveStatusFluxo(c);
 await saveRecord('consulentes',c.id,consToDB(c));
-addHistDB(c.nomeCompleto+' \u2022 Venda #'+nv.id+' gerada para medicina: '+f.item.titulo);
-toast('Venda #'+nv.id+' criada!');
+addHistDB(c.nomeCompleto+' \u2022 Pedido #'+nv.id+' ('+selecionadas.length+' medicinas, R$'+subtotal.toFixed(2)+')');
+// Limpa seleção
+S.gestaoMedicinasSel={};
+toast('Pedido #'+nv.id+' criado com '+selecionadas.length+' medicina(s)!');
+render()};
+
+// Mantido como alias para compatibilidade com código antigo
+window.gerarVendaDeMedicina=async function(itemId){
+S.gestaoMedicinasSel={};S.gestaoMedicinasSel[itemId]=true;
+return window.gerarPedidoAgrupado()};
+
+// Utilitário: agrupa vendas soltas de medicinas de um consulente em uma única venda
+window.agruparVendasMedicinas=async function(consulenteId){
+var c=getCons(consulenteId||S.gestaoConsId);if(!c)return;
+var p=c.pessoaId?getPessoa(c.pessoaId):null;if(!p)return toast('Cliente não encontrado','error');
+var meds=normalizeItems(c.prescricaoMedicinasItens,'medicina');
+// Encontra vendas existentes vinculadas a este consulente via medicinas
+var vendaIds=meds.map(function(m){return m.vendaId}).filter(Boolean);
+var vendasAgrupar=S.vendas.filter(function(v){return vendaIds.indexOf(v.id)>=0&&v.status==='pedido_feito'});
+if(vendasAgrupar.length<=1)return toast('Não há vendas soltas para agrupar','info');
+if(!confirm('Agrupar '+vendasAgrupar.length+' vendas em uma só?\n\nAs vendas originais serão EXCLUÍDAS e uma nova será criada consolidada.\nEssa ação não pode ser desfeita.'))return;
+// Consolida itens
+var itensConsolidados=[];
+vendasAgrupar.forEach(function(v){(v.itens||[]).forEach(function(it){itensConsolidados.push(it)})});
+var subtotal=itensConsolidados.reduce(function(a,b){return a+(parseFloat(b.valorTotal)||0)},0);
+// Cria venda consolidada
+var nv={id:0,pessoaId:p.id,data:today(),itens:itensConsolidados,tipoFrete:'a_definir',valorFrete:0,subtotal:subtotal,totalComFrete:subtotal,status:'pedido_feito',formaPagamento:'',codigoRastreio:'',comprovante:'',observacoes:'Agrupamento retroativo de '+vendasAgrupar.length+' pedidos \u2014 '+c.nomeCompleto};
+var dbv=await insertRecord('vendas',vendaToDB(nv));
+if(!dbv||!dbv.id){toast('Falha ao criar pedido agrupado.','error');return}
+nv.id=dbv.id;
+S.vendas.push(nv);
+// Atualiza vendaId nas medicinas
+meds.forEach(function(m){if(vendaIds.indexOf(m.vendaId)>=0)m.vendaId=nv.id});
+c.prescricaoMedicinasItens=meds;
+// Remove as vendas antigas
+for(var i=0;i<vendasAgrupar.length;i++){
+await deleteRecord('vendas',vendasAgrupar[i].id);
+S.vendas=S.vendas.filter(function(x){return x.id!==vendasAgrupar[i].id})}
+await saveRecord('consulentes',c.id,consToDB(c));
+addHistDB(c.nomeCompleto+' \u2022 Agrupadas '+vendasAgrupar.length+' vendas em #'+nv.id);
+toast('Vendas agrupadas em #'+nv.id+'!');
 render()};
 
 // Utilitário para limpar vendaIds fantasma em consulentes (vendaId aponta pra venda que não existe)
@@ -1883,6 +2004,21 @@ window.goPerfilFromVenda=function(vid){closeModal();setTab('vendas')};
 window.moveVenda=function(id,dir){var v=getVenda(id);if(!v)return;var idx=STATUS_VENDA.findIndex(function(s){return s.key===v.status});var ni=idx+dir;if(ni>=0&&ni<STATUS_VENDA.length){v.status=STATUS_VENDA[ni].key;saveRecord('vendas',v.id,vendaToDB(v));addHistDB('Venda #'+id+' \u2192 '+vendaStatusLabel(v.status));render()}};
 window.addRastreio=function(id){S.viewVendaId=id;S.modal='rastreio';render()};
 window.saveRastreio=function(){var v=getVenda(S.viewVendaId);if(v){v.codigoRastreio=document.getElementById('mRastreio').value.trim();saveRecord('vendas',v.id,vendaToDB(v));addHistDB('Rastreio #'+v.id);toast('OK!')}closeModal()};
+
+window.openDefinirFrete=function(id){S.viewVendaId=id;S.modal='definirFrete';render()};
+window.saveDefinirFrete=async function(){
+var v=getVenda(S.viewVendaId);if(!v)return;
+var tipo=document.getElementById('dfTipo').value;
+var valor=parseFloat(document.getElementById('dfValor').value)||0;
+if(!tipo)return toast('Escolha o tipo de frete','error');
+if(tipo==='retirada')valor=0;
+v.tipoFrete=tipo;
+v.valorFrete=valor;
+v.totalComFrete=(parseFloat(v.subtotal)||0)+valor;
+await saveRecord('vendas',v.id,vendaToDB(v));
+addHistDB('Frete definido Pedido #'+v.id+': '+freteLabel(tipo)+' R$'+valor.toFixed(2));
+toast('Frete atualizado!');
+closeModal()};
 
 // Consulente advance/revert
 window.getCons=getCons;
