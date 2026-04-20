@@ -163,7 +163,7 @@ tr:hover td{background:var(--accent-bg)}
 .currency-wrap{position:relative}
 .currency-wrap input{padding-left:36px!important}
 .st-aguardando_ebo_ritual{background:#FDE8D0;color:#CA6F1E}
-@media print{body *{visibility:hidden}#eboSheet,#eboSheet *{visibility:visible}#eboSheet{position:fixed;top:0;left:0;width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;z-index:9999}#eboSheet .ebo-nome{font-size:72px;font-weight:700;text-align:center;margin-bottom:16px}#eboSheet .ebo-mae{font-size:36px;font-weight:700;text-align:center;margin-bottom:12px}#eboSheet .ebo-nasc{font-size:28px;font-weight:700;text-align:center;margin-bottom:12px}#eboSheet .ebo-local{font-size:24px;font-weight:700;text-align:center}@page{size:landscape;margin:1cm}}
+@media print{body *{visibility:hidden}#eboSheet,#eboSheet *{visibility:visible}#eboSheet{position:fixed;top:0;left:0;width:100vw;height:100vh;background:#fff;z-index:9999}#eboSheet .ebo-page{width:100%;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;page-break-after:always}#eboSheet .ebo-page:last-child{page-break-after:auto}#eboSheet .ebo-nome{font-size:72px;font-weight:700;text-align:center;margin-bottom:16px}#eboSheet .ebo-mae{font-size:36px;font-weight:700;text-align:center;margin-bottom:12px}#eboSheet .ebo-nasc{font-size:28px;font-weight:700;text-align:center;margin-bottom:12px}#eboSheet .ebo-local{font-size:24px;font-weight:700;text-align:center}#eboSheet .ebo-fotos{display:flex;gap:20px;align-items:center;justify-content:center;width:100%;height:100%}#eboSheet .ebo-foto-box{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px}#eboSheet .ebo-foto-img{max-width:100%;max-height:80vh;object-fit:contain;filter:grayscale(100%) contrast(1.05);border:1px solid #000}#eboSheet .ebo-foto-cap{font-size:20px;font-weight:700;margin-top:12px;text-align:center;color:#000}@page{size:landscape;margin:1cm}}
 @media(max-width:600px){.header{flex-direction:column;gap:8px;text-align:center}.search-bar{flex-direction:column}.tab{padding:8px 10px;font-size:12px}.report-cards{grid-template-columns:1fr 1fr}.modal{padding:20px 16px}.bar-chart{height:160px}.kanban-grid{grid-template-columns:1fr}.form-group-row{grid-template-columns:1fr}.detail-grid{grid-template-columns:1fr}.quick-bar{justify-content:center}}
 </style>
 </head>
@@ -851,7 +851,39 @@ function getFilteredItems(){var it=S.items.slice();if(S.filterSecao)it=it.filter
 function getFilteredPessoas(){var l=S.pessoas.slice();if(S.search.trim())l=l.filter(function(p){return fuzzy(S.search,p.nome+' '+(p.telefone||''))});return l}
 function paginate(a){var s=(S.page-1)*S.perPage;return a.slice(s,s+S.perPage)}
 
-function gerarEbo(c){var el=document.getElementById('eboSheet');el.innerHTML='<div class="ebo-nome">'+esc(c.nomeCompleto)+'</div><div class="ebo-mae">Mãe: '+esc(c.nomeMae||'')+'</div><div class="ebo-nasc">'+fmtDate(c.dataNascimento)+'</div><div class="ebo-local">'+esc((c.cidade||'')+' - '+(c.pais||''))+'</div>';el.style.display='flex';setTimeout(function(){window.print();el.style.display='none'},200)}
+function gerarEbo(c){
+var p=c.pessoaId?getPessoa(c.pessoaId):null;
+var foto=p&&p.foto?p.foto:'';
+var renderSheet=function(imgSrc){
+var el=document.getElementById('eboSheet');
+// Page 1 — existing content (name, mother, birth, location)
+var page1='<div class="ebo-page"><div class="ebo-nome">'+esc(c.nomeCompleto)+'</div><div class="ebo-mae">Mãe: '+esc(c.nomeMae||'')+'</div><div class="ebo-nasc">'+fmtDate(c.dataNascimento)+'</div><div class="ebo-local">'+esc((c.cidade||'')+' - '+(c.pais||''))+'</div></div>';
+// Page 2 — duas fotos lado a lado para impressão P&B
+var cap='<div class="ebo-foto-cap">'+esc(c.nomeCompleto)+'</div>';
+var foto1='<div class="ebo-foto-box"><img class="ebo-foto-img" src="'+imgSrc+'" alt="Foto">'+cap+'</div>';
+var foto2='<div class="ebo-foto-box"><img class="ebo-foto-img" src="'+imgSrc+'" alt="Foto">'+cap+'</div>';
+var page2='<div class="ebo-page"><div class="ebo-fotos">'+foto1+foto2+'</div></div>';
+el.innerHTML=page1+(imgSrc?page2:'');
+el.style.display='block';
+setTimeout(function(){window.print();el.style.display='none'},300)};
+if(foto){renderSheet(foto);return}
+// Sem foto cadastrada: pergunta se quer selecionar agora
+if(!confirm('Este consulente não tem foto cadastrada no perfil.\n\nOK = Selecionar uma foto agora (apenas para esta impressão)\nCancelar = Imprimir só a folha de identificação, sem fotos'))
+{renderSheet('');return}
+// Abre dialogo de arquivo
+var inp=document.createElement('input');inp.type='file';inp.accept='image/*';
+inp.onchange=function(ev){
+var f=ev.target.files&&ev.target.files[0];if(!f){renderSheet('');return}
+var rd=new FileReader();
+rd.onload=function(e){
+// Oferece salvar permanentemente no cadastro
+if(p&&confirm('Salvar esta foto também no cadastro do consulente?')){
+p.foto=e.target.result;
+saveRecord('pessoas',p.id,pessoaToDB(p));
+addHistDB('Foto cadastrada: '+p.nome)}
+renderSheet(e.target.result)};
+rd.readAsDataURL(f)};
+inp.click()}
 
 function downloadBackup(){var d=getDataObj();d.items=S.items;d.dataBackup=new Date().toISOString();var b=new Blob([JSON.stringify(d)],{type:'application/json'});var u=URL.createObjectURL(b);var a=document.createElement('a');a.href=u;a.download='backup_ile_'+today()+'.json';a.click();URL.revokeObjectURL(u);toast('Backup baixado!')}
 function restoreBackup(file){var r=new FileReader();r.onload=function(e){try{var d=JSON.parse(e.target.result);S.confirmText='<strong>Restaurar backup?</strong><br>Substituirá TODOS os dados (local + nuvem).';S.confirmAction=function(){applyData(d);save();toast('Restaurado e sincronizando...');render()};S.modal='confirm';render()}catch(err){toast('Erro!','error')}};r.readAsText(file)}
@@ -1813,9 +1845,16 @@ var c=getCons(S.gestaoConsId);if(!c)return;
 var f=_findItem(c,'medicina',itemId);if(!f)return;
 var p=c.pessoaId?getPessoa(c.pessoaId):null;
 if(!p)return toast('Cliente não encontrado','error');
+if(f.item.vendaId){
+// Sanity check: se o vendaId gravado aponta para venda inexistente (fantasma), limpa
+var exists=S.vendas.find(function(v){return v.id===f.item.vendaId});
+if(!exists){console.warn('Limpando vendaId fantasma:',f.item.vendaId);f.item.vendaId=null;_writeBack(c,'medicina',f.arr)}
+else return toast('Esta medicina já possui venda vinculada (#'+f.item.vendaId+')','info')}
 // Create venda
-var nv={id:nid(S.vendas),pessoaId:p.id,data:today(),items:[{nome:f.item.titulo,qtd:1,valorUnit:f.item.valor,valorTotal:f.item.valor}],tipoFrete:'pac',valorFrete:0,totalItens:f.item.valor,totalComFrete:f.item.valor,status:'pedido_feito',origem:'prescricao_medicina',codigoRastreio:'',observacoes:'Gerada da prescrição \u2014 '+c.nomeCompleto};
-var dbv=await insertRecord('vendas',vendaToDB(nv));if(dbv)nv.id=dbv.id;
+var nv={id:0,pessoaId:p.id,data:today(),itens:[{nome:f.item.titulo,qtd:1,valorUnit:f.item.valor,valorTotal:f.item.valor}],tipoFrete:'pac',valorFrete:0,subtotal:f.item.valor,totalComFrete:f.item.valor,status:'pedido_feito',formaPagamento:'',codigoRastreio:'',comprovante:'',observacoes:'Gerada da prescrição \u2014 '+c.nomeCompleto};
+var dbv=await insertRecord('vendas',vendaToDB(nv));
+if(!dbv||!dbv.id){toast('Falha ao criar venda. Nenhuma alteração gravada.','error');return}
+nv.id=dbv.id;
 S.vendas.push(nv);
 f.item.vendaId=nv.id;
 f.item.status='em_andamento';
@@ -1825,6 +1864,18 @@ await saveRecord('consulentes',c.id,consToDB(c));
 addHistDB(c.nomeCompleto+' \u2022 Venda #'+nv.id+' gerada para medicina: '+f.item.titulo);
 toast('Venda #'+nv.id+' criada!');
 render()};
+
+// Utilitário para limpar vendaIds fantasma em consulentes (vendaId aponta pra venda que não existe)
+window.limparVendasFantasma=async function(){
+var total=0;
+for(var i=0;i<S.consulentes.length;i++){
+var c=S.consulentes[i];
+var meds=normalizeItems(c.prescricaoMedicinasItens,'medicina');
+var mudou=false;
+meds.forEach(function(m){if(m.vendaId&&!S.vendas.find(function(v){return v.id===m.vendaId})){console.log('Cons '+c.id+' medicina '+m.titulo+' tinha vendaId fantasma '+m.vendaId);m.vendaId=null;mudou=true;total++}});
+if(mudou){c.prescricaoMedicinasItens=meds;await saveRecord('consulentes',c.id,consToDB(c))}}
+toast(total+' vendaId(s) fantasma limpo(s). Recarregue a página.','info');
+console.log('Limpeza concluída. Total:',total)};
 
 window.goPerfilFromVenda=function(vid){closeModal();setTab('vendas')};
 
