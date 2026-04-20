@@ -1814,7 +1814,7 @@ var f=_findItem(c,'medicina',itemId);if(!f)return;
 var p=c.pessoaId?getPessoa(c.pessoaId):null;
 if(!p)return toast('Cliente não encontrado','error');
 // Create venda
-var nv={id:nid(S.vendas),pessoaId:p.id,data:today(),items:[{nome:f.item.titulo,qtd:1,valorUnit:f.item.valor,valorTotal:f.item.valor}],tipoFrete:'pac',valorFrete:0,totalItens:f.item.valor,totalComFrete:f.item.valor,status:'aguardando_pagamento',origem:'prescricao_medicina',codigoRastreio:'',observacoes:'Gerada da prescrição \u2014 '+c.nomeCompleto};
+var nv={id:nid(S.vendas),pessoaId:p.id,data:today(),items:[{nome:f.item.titulo,qtd:1,valorUnit:f.item.valor,valorTotal:f.item.valor}],tipoFrete:'pac',valorFrete:0,totalItens:f.item.valor,totalComFrete:f.item.valor,status:'pedido_feito',origem:'prescricao_medicina',codigoRastreio:'',observacoes:'Gerada da prescrição \u2014 '+c.nomeCompleto};
 var dbv=await insertRecord('vendas',vendaToDB(nv));if(dbv)nv.id=dbv.id;
 S.vendas.push(nv);
 f.item.vendaId=nv.id;
