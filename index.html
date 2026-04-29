@@ -441,6 +441,16 @@ function consToDB(c){return {id:c.id||undefined,pessoa_id:c.pessoaId||null,nome_
 function consFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,nomeCompleto:r.nome_completo,nomeMae:r.nome_mae||'',dataNascimento:r.data_nascimento||'',telefoneWhatsApp:r.telefone_whatsapp||'',dataConsulta:r.data_consulta||'',horarioConsulta:r.horario_consulta||'',formatoConsulta:r.formato_consulta||'',origem:r.origem||'',tipoConsulta:r.tipo_consulta||'normal',formaPagamento:r.forma_pagamento||'',valorCobrado:r.valor_cobrado||0,valorRecebido:r.valor_recebido||0,statusPagamento:r.status_pagamento||'pendente',statusFluxo:r.status_fluxo||'aguardando_consulta',logradouro:r.logradouro||'',numero:r.numero||'',complemento:r.complemento||'',bairro:r.bairro||'',cidade:r.cidade||'',estado:r.estado||'',cep:r.cep||'',pais:r.pais||'Brasil',oduResultado:r.odu_resultado||'',oduDescricao:r.odu_descricao||'',consideracoesGerais:r.consideracoes_gerais||'',prescricaoRituais:r.prescricao_rituais||'',prescricaoMedicinas:r.prescricao_medicinas||'',observacoesPrescricao:r.observacoes_prescricao||'',prescricaoEbos:normalizeItems(r.prescricao_ebos,'ebo'),prescricaoMedicinasItens:normalizeItems(r.prescricao_medicinas_itens,'medicina'),registroPagamentos:r.registro_pagamentos||[],comprovante:r.comprovante||''}}
 function vendaToDB(v){return {id:v.id||undefined,pessoa_id:v.pessoaId||null,data:v.data||today(),itens:v.itens||[],subtotal:v.subtotal||0,valor_frete:v.valorFrete||0,total_com_frete:v.totalComFrete||0,tipo_frete:v.tipoFrete||'',forma_pagamento:v.formaPagamento||'',status:v.status||'pedido_feito',codigo_rastreio:v.codigoRastreio||'',comprovante:v.comprovante||''}}
 function vendaFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,data:r.data||'',itens:r.itens||[],subtotal:r.subtotal||0,valorFrete:r.valor_frete||0,totalComFrete:r.total_com_frete||0,tipoFrete:r.tipo_frete||'',formaPagamento:r.forma_pagamento||'',status:r.status||'pedido_feito',codigoRastreio:r.codigo_rastreio||'',comprovante:r.comprovante||''}}
+
+// Mappers items (estoque) com auditoria
+function itemToDB(i){return {id:i.id||undefined,nome:i.nome||'',tipo:i.tipo||'',secao:i.secao||'',localizacao:i.localizacao||'',observacoes:i.observacoes||''}}
+function itemFromDB(r){return {id:r.id,nome:r.nome||'',tipo:r.tipo||'',secao:r.secao||'',localizacao:r.localizacao||'',observacoes:r.observacoes||'',criadoEm:r.criado_em||null,criadoPor:r.criado_por||'',atualizadoEm:r.atualizado_em||null,atualizadoPor:r.atualizado_por||''}}
+
+// Helpers de auditoria — preenche criado_por/atualizado_por com usuário atual
+function _user(){return (S.currentUser&&S.currentUser.username)||'desconhecido'}
+function _stampInsert(d){d.criado_por=_user();return d}
+function _stampUpdate(d){d.atualizado_em=new Date().toISOString();d.atualizado_por=_user();return d}
+function fmtDateTime(iso){if(!iso)return '';try{var d=new Date(iso);if(isNaN(d.getTime()))return '';return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}catch(e){return ''}}
 function cicloToDB(c){return {id:c.id||undefined,pessoa_id:c.pessoaId||null,tipo:c.tipo||'',data_inicio:c.dataInicio||today(),data_fim:c.dataFim||null,status:c.status||'ativo',observacoes:c.observacoes||''}}
 function cicloFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,tipo:r.tipo||'',dataInicio:r.data_inicio||'',dataFim:r.data_fim||'',status:r.status||'ativo',observacoes:r.observacoes||''}}
 function interToDB(i){return {id:i.id||undefined,ciclo_id:i.cicloId||null,tipo:i.tipo||'',data:i.data||today(),descricao:i.descricao||'',valor:i.valor||'',forma_pagamento:i.formaPagamento||'',status:i.status||'',criado_por:i.criadoPor||''}}
@@ -609,21 +619,31 @@ try{
     {key:'interacoes', map:interFromDB},
     {key:'crediarios', map:credFromDB},
     {key:'rituais', map:ritualFromDB},
-    {key:'livros', map:null}
+    {key:'livros', map:null},
+    {key:'items', map:itemFromDB}
   ];
 
   for (const t of tables){
 
-    const resp = await sbGet(t.key,'?order=id.asc');
-
-    if(!resp.ok){
-      console.log('[LOAD FAIL]', t.key, resp.status);
-      continue;
+    // Paginação para tabelas que possam ter > 1000 linhas (limite padrão do PostgREST)
+    const PAGE = 1000;
+    let allRows = [];
+    let offset = 0;
+    while(true){
+      const resp = await sbGet(t.key,'?order=id.asc&limit='+PAGE+'&offset='+offset);
+      if(!resp.ok){
+        console.log('[LOAD FAIL]', t.key, resp.status);
+        break;
+      }
+      const page = await resp.json();
+      if(!page||!page.length)break;
+      allRows = allRows.concat(page);
+      if(page.length < PAGE)break;
+      offset += PAGE;
+      if(offset > 50000){console.warn('[LOAD] safety stop at 50k for',t.key);break}
     }
 
-    const rows = await resp.json();
-
-    S[t.key] = t.map ? rows.map(t.map) : rows;
+    S[t.key] = t.map ? allRows.map(t.map) : allRows;
 
     console.log('[LOAD]', t.key, S[t.key].length);
   }
@@ -1170,7 +1190,16 @@ var SECOES_LIVRO=["Sala de Consulta do Bàbá","Prateleira das Esculturas","Prat
 
 function getFilteredLivros(){var li=S.livros.slice();if(S.filterGenero)li=li.filter(function(l){return l.genero===S.filterGenero});if(S.filterTipoLivro)li=li.filter(function(l){return l.tipo===S.filterTipoLivro});if(S.filterSecaoLivro)li=li.filter(function(l){return l.secao===S.filterSecaoLivro});if(S.search.trim())li=li.filter(function(l){return fuzzy(S.search,l.nome+' '+l.autor+' '+l.genero+' '+l.secao)});return li}
 
-function renderBibliotecaTable(pg,total){var pp=Math.ceil(total/S.perPage);var canEdit=hasRole(['admin','babalawo','assistente']);if(!pg.length)return '<div class="table-wrap"><div class="empty-state">Nenhum livro encontrado</div></div>';return '<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Nome</th><th>Autor</th><th>Tipo</th><th>Gênero</th><th>Seção</th><th>Local</th>'+(canEdit?'<th>Ações</th>':'')+'</tr></thead><tbody>'+pg.map(function(l){return '<tr><td style="font-weight:500">'+esc(l.nome)+'</td><td>'+esc(l.autor)+'</td><td><span class="tipo-badge" style="background:var(--info-bg);color:var(--info)">'+esc(l.tipo)+'</span></td><td style="font-size:12px">'+esc(l.genero)+'</td><td style="font-size:12px">'+esc(l.secao)+'</td><td style="font-size:12px">'+esc(l.localizacao)+'</td>'+(canEdit?'<td><div class="actions-cell"><button class="edit-btn btn-sm" onclick="openEditLivro('+l.id+')">Editar</button><button class="del-btn btn-sm" onclick="confirmDelLivro('+l.id+')">X</button></div></td>':'')+'</tr>'}).join('')+'</tbody></table></div>'+(pp>1?renderPag(pp):'')+'</div>'}
+function auditCell(rec){
+var atu=rec.atualizado_em||rec.atualizadoEm;
+var atuP=rec.atualizado_por||rec.atualizadoPor;
+var cri=rec.criado_em||rec.criadoEm;
+var criP=rec.criado_por||rec.criadoPor;
+if(atu){return '<div style="font-size:11px;line-height:1.3"><div style="color:var(--text2)">Editado: '+fmtDateTime(atu)+'</div><div style="color:var(--text3);font-size:10px">'+esc(atuP||'')+'</div></div>'}
+if(cri){return '<div style="font-size:11px;line-height:1.3"><div style="color:var(--text2)">'+fmtDateTime(cri)+'</div><div style="color:var(--text3);font-size:10px">'+esc(criP||'')+'</div></div>'}
+return '<span style="color:var(--text3);font-size:11px">—</span>'}
+
+function renderBibliotecaTable(pg,total){var pp=Math.ceil(total/S.perPage);var canEdit=hasRole(['admin','babalawo','assistente']);if(!pg.length)return '<div class="table-wrap"><div class="empty-state">Nenhum livro encontrado</div></div>';return '<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Nome</th><th>Autor</th><th>Tipo</th><th>Gênero</th><th>Seção</th><th>Local</th><th>Cadastrado</th>'+(canEdit?'<th>Ações</th>':'')+'</tr></thead><tbody>'+pg.map(function(l){return '<tr><td style="font-weight:500">'+esc(l.nome)+'</td><td>'+esc(l.autor)+'</td><td><span class="tipo-badge" style="background:var(--info-bg);color:var(--info)">'+esc(l.tipo)+'</span></td><td style="font-size:12px">'+esc(l.genero)+'</td><td style="font-size:12px">'+esc(l.secao)+'</td><td style="font-size:12px">'+esc(l.localizacao)+'</td><td>'+auditCell(l)+'</td>'+(canEdit?'<td><div class="actions-cell"><button class="edit-btn btn-sm" onclick="openEditLivro('+l.id+')">Editar</button><button class="del-btn btn-sm" onclick="confirmDelLivro('+l.id+')">X</button></div></td>':'')+'</tr>'}).join('')+'</tbody></table></div>'+(pp>1?renderPag(pp):'')+'</div>'}
 
 function renderBiblioteca(){
 var fi=getFilteredLivros(),pg=paginate(fi);
@@ -1234,7 +1263,7 @@ return h}
 
 // === ESTOQUE / RELATÓRIOS / CLIENTES / PERFIL / CICLO (keeping same as v5) ===
 function renderSearch(ed){var fi=getFilteredItems(),pg=paginate(fi);var ab=ed?'<button class="btn btn-primary" onclick="openAddItem()">+ Item</button>':'';var so=SECOES.map(function(s){return '<option value="'+esc(s)+'"'+(S.filterSecao===s?' selected':'')+'>'+esc(s)+'</option>'}).join('');var to=TIPOS.map(function(t){return '<option value="'+esc(t)+'"'+(S.filterTipo===t?' selected':'')+'>'+esc(t)+'</option>'}).join('');return '<div class="search-section"><div class="search-bar"><input class="search-input" placeholder="Buscar item..." value="'+esc(S.search)+'" id="searchInput"><button class="btn btn-primary" onclick="doSearch()">Buscar</button>'+ab+'</div><div class="filters"><select onchange="S.filterSecao=this.value;S.page=1;render()"><option value="">Todas</option>'+so+'</select><select onchange="S.filterTipo=this.value;S.page=1;render()"><option value="">Todos</option>'+to+'</select></div><div class="result-count">'+fi.length+'</div></div>'+renderItemTable(pg,fi.length,ed)}
-function renderItemTable(it,tot,ed){if(!it.length)return '<div class="table-wrap"><div class="empty-state">Nenhum</div></div>';var pp=Math.ceil(tot/S.perPage);return '<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>#</th><th>Nome</th><th>Tipo</th><th>Seção</th><th>Local</th>'+(ed?'<th>Ações</th>':'')+'</tr></thead><tbody>'+it.map(function(i){return '<tr><td>'+i.id+'</td><td style="font-weight:500">'+esc(i.nome)+'</td><td><span class="tipo-badge '+tipoClass(i.tipo)+'">'+esc(i.tipo)+'</span></td><td>'+esc(i.secao)+'</td><td>'+esc(i.localizacao)+'</td>'+(ed?'<td><div class="actions-cell"><button class="edit-btn btn-sm" onclick="openEditItem('+i.id+')">Editar</button><button class="del-btn btn-sm" onclick="confirmDel(\'item\','+i.id+')">X</button></div></td>':'')+'</tr>'}).join('')+'</tbody></table></div>'+(pp>1?renderPag(pp):'')+'</div>'}
+function renderItemTable(it,tot,ed){if(!it.length)return '<div class="table-wrap"><div class="empty-state">Nenhum</div></div>';var pp=Math.ceil(tot/S.perPage);return '<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>#</th><th>Nome</th><th>Tipo</th><th>Seção</th><th>Local</th><th>Cadastrado</th>'+(ed?'<th>Ações</th>':'')+'</tr></thead><tbody>'+it.map(function(i){return '<tr><td>'+i.id+'</td><td style="font-weight:500">'+esc(i.nome)+'</td><td><span class="tipo-badge '+tipoClass(i.tipo)+'">'+esc(i.tipo)+'</span></td><td>'+esc(i.secao)+'</td><td>'+esc(i.localizacao)+'</td><td>'+auditCell(i)+'</td>'+(ed?'<td><div class="actions-cell"><button class="edit-btn btn-sm" onclick="openEditItem('+i.id+')">Editar</button><button class="del-btn btn-sm" onclick="confirmDel(\'item\','+i.id+')">X</button></div></td>':'')+'</tr>'}).join('')+'</tbody></table></div>'+(pp>1?renderPag(pp):'')+'</div>'}
 function renderPag(pp){var b='',s=Math.max(1,S.page-3),e=Math.min(pp,S.page+3);if(S.page>1)b+='<button class="page-btn" onclick="S.page='+(S.page-1)+';render()">\u2039</button>';for(var i=s;i<=e;i++)b+='<button class="page-btn'+(i===S.page?' active':'')+'" onclick="S.page='+i+';render()">'+i+'</button>';if(S.page<pp)b+='<button class="page-btn" onclick="S.page='+(S.page+1)+';render()">\u203A</button>';return '<div class="pagination">'+b+'</div>'}
 function renderRelatorios(){var bs={},bt={};SECOES.forEach(function(s){bs[s]=0});TIPOS.forEach(function(t){bt[t]=0});S.items.forEach(function(i){bs[i.secao]=(bs[i.secao]||0)+1;bt[i.tipo]=(bt[i.tipo]||0)+1});var mx=Math.max.apply(null,Object.values(bt).concat([1]));var cc='';SECOES.forEach(function(s){cc+='<div class="report-card"><div class="rc-label">'+esc(s)+'</div><div class="rc-value">'+(bs[s]||0)+'</div></div>'});var bars=TIPOS.map(function(t,i){return '<div class="bar-col"><div class="bar-value">'+(bt[t]||0)+'</div><div class="bar" style="height:'+Math.round((bt[t]/mx)*190)+'px;background:'+BAR_COLORS[i%BAR_COLORS.length]+'"></div><div class="bar-label">'+esc(t)+'</div></div>'}).join('');var cN=S.consulentes.filter(function(c){return (c.tipoConsulta||'normal')==='normal'});var cU=S.consulentes.filter(function(c){return c.tipoConsulta==='urgencia'});var tC=S.consulentes.length,cobN=0,recN=0,cobU=0,recU=0;cN.forEach(function(c){cobN+=consValorCobrado(c);recN+=consValorRecebido(c)});cU.forEach(function(c){cobU+=consValorCobrado(c);recU+=consValorRecebido(c)});var cobT=cobN+cobU,recT=recN+recU;var ch='<div class="chart-container"><div class="chart-title">Consultas por Tipo</div><div class="report-cards" style="margin-bottom:12px">';ch+='<div class="report-card" style="border-left-color:var(--accent)"><div class="rc-label">Total Consultas</div><div class="rc-value">'+tC+'</div><div class="rc-sub">Cobrado: R$'+cobT.toFixed(2)+'</div></div>';ch+='<div class="report-card" style="border-left-color:var(--info)"><div class="rc-label">Normal</div><div class="rc-value">'+cN.length+'</div><div class="rc-sub">Cobrado: R$'+cobN.toFixed(2)+'</div></div>';ch+='<div class="report-card" style="border-left-color:var(--danger)"><div class="rc-label">Urgência</div><div class="rc-value">'+cU.length+'</div><div class="rc-sub">Cobrado: R$'+cobU.toFixed(2)+'</div></div>';ch+='<div class="report-card" style="border-left-color:var(--success)"><div class="rc-label">Total Recebido</div><div class="rc-value">R$'+recT.toFixed(0)+'</div><div class="rc-sub">Normal: R$'+recN.toFixed(2)+' | Urgência: R$'+recU.toFixed(2)+'</div></div>';ch+='</div>';ch+='<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Tipo</th><th>Qtd</th><th>Cobrado</th><th>Recebido</th><th>Ticket Médio</th></tr></thead><tbody>';ch+='<tr><td style="font-weight:500">Normal</td><td>'+cN.length+'</td><td>R$'+cobN.toFixed(2)+'</td><td>R$'+recN.toFixed(2)+'</td><td>R$'+(cN.length?cobN/cN.length:0).toFixed(2)+'</td></tr>';ch+='<tr><td style="font-weight:500">Urgência</td><td>'+cU.length+'</td><td>R$'+cobU.toFixed(2)+'</td><td>R$'+recU.toFixed(2)+'</td><td>R$'+(cU.length?cobU/cU.length:0).toFixed(2)+'</td></tr>';ch+='<tr style="font-weight:700;background:var(--accent-bg)"><td>TOTAL</td><td>'+tC+'</td><td>R$'+cobT.toFixed(2)+'</td><td>R$'+recT.toFixed(2)+'</td><td>R$'+(tC?cobT/tC:0).toFixed(2)+'</td></tr>';ch+='</tbody></table></div></div></div>';return ch+'<div class="chart-container"><div class="chart-title">Itens por Seção</div><div class="report-cards">'+cc+'</div></div><div class="chart-container"><div class="chart-title">Itens por Tipo</div><div class="bar-chart">'+bars+'</div></div>'}
 
@@ -1585,7 +1614,7 @@ window.closeModal=function(){S.modal=null;S.editItem=null;S.editUser=null;S.edit
 
 window.openAddItem=function(){S.editItem=null;S.modal='addItem';render()};
 window.openEditItem=function(id){S.editItem=S.items.find(function(i){return i.id===id});S.modal='editItem';render()};
-window.saveItem=function(){var n=document.getElementById('mNome').value.trim();var err=validateText(n,2,300,'Nome do item');if(err)return toast(err,'error');var d={nome:n,tipo:document.getElementById('mTipo').value,secao:document.getElementById('mSecao').value,localizacao:document.getElementById('mLoc').value.trim()};if(S.editItem){Object.assign(S.editItem,d);addHistDB('Item')}else{d.id=nid(S.items);S.items.push(d);addHistDB('+ Item')}toast('OK!');closeModal()};
+window.saveItem=async function(){var n=document.getElementById('mNome').value.trim();var err=validateText(n,2,300,'Nome do item');if(err)return toast(err,'error');var d={nome:n,tipo:document.getElementById('mTipo').value,secao:document.getElementById('mSecao').value,localizacao:document.getElementById('mLoc').value.trim()};if(S.editItem){var dbPayload=_stampUpdate(itemToDB(d));var ok=await saveRecord('items',S.editItem.id,dbPayload);if(ok){Object.assign(S.editItem,d,{atualizadoEm:dbPayload.atualizado_em,atualizadoPor:dbPayload.atualizado_por});addHistDB('Item editado: '+n);toast('OK!')}else{toast('Falha ao salvar','error')}}else{var dbNew=_stampInsert(itemToDB(d));var inserted=await insertRecord('items',dbNew);if(inserted){d.id=inserted.id;d.criadoEm=inserted.criado_em||new Date().toISOString();d.criadoPor=inserted.criado_por||_user();S.items.push(d);addHistDB('+ Item: '+n);toast('OK!')}else{toast('Falha ao criar item','error')}}closeModal()};
 
 window.openAddPessoa=function(){S.editItem=null;S.modal='addPessoa';render()};
 window.openEditPessoa=function(id){S.editItem=id;S.modal='editPessoa';render()};
@@ -2092,7 +2121,7 @@ window.savePagCrediario=function(){var cr=S.crediarios.find(function(c){return c
 window.viewComprovante=function(crId,pgIdx){var cr=S.crediarios.find(function(c){return c.id===crId});if(!cr||!cr.pagamentos[pgIdx]||!cr.pagamentos[pgIdx].comprovante)return toast('Sem comprovante','error');var w=window.open('','_blank');w.document.write('<html><body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#333"><img src="'+cr.pagamentos[pgIdx].comprovante+'" style="max-width:100%;max-height:100vh"></body></html>');w.document.close()};
 
 window.confirmDel=function(type,id){
-if(type==='item'){var it=S.items.find(function(i){return i.id===id});S.confirmText='Excluir?';S.confirmAction=function(){S.items=S.items.filter(function(i){return i.id!==id});addHistDB('-Item: '+(it?it.nome:''));if(S.currentUser.perfil==='editor'){S.notifications.push({tipo:'alerta_exclusao',nome:'Editor excluiu item: '+(it?it.nome:''),time:new Date().toLocaleString('pt-BR'),msg:'Editor '+S.currentUser.username+' excluiu item'})}toast('OK!','info')}}
+if(type==='item'){var it=S.items.find(function(i){return i.id===id});S.confirmText='Excluir?';S.confirmAction=async function(){var ok=await deleteRecord('items',id);if(ok){S.items=S.items.filter(function(i){return i.id!==id});addHistDB('-Item: '+(it?it.nome:''));if(S.currentUser.perfil==='editor'){S.notifications.push({tipo:'alerta_exclusao',nome:'Editor excluiu item: '+(it?it.nome:''),time:new Date().toLocaleString('pt-BR'),msg:'Editor '+S.currentUser.username+' excluiu item'})}toast('OK!','info')}else{toast('Falha ao excluir','error')}}}
 else if(type==='user'){S.confirmText='Excluir usuário?';S.confirmAction=function(){toast('Use o Dashboard do Supabase para excluir usuários','info')}}
 else if(type==='inter'){S.confirmText='Excluir?';S.confirmAction=function(){S.interacoes=S.interacoes.filter(function(x){return x.id!==id});addHistDB('-Inter');toast('OK!','info');render()}}
 S.modal='confirm';render()};
@@ -2136,10 +2165,12 @@ var n=document.getElementById('lvNome').value.trim();
 var err=validateText(n,1,500,'Nome do livro');if(err)return toast(err,'error');
 var d={nome:n,tipo:document.getElementById('lvTipo').value,genero:document.getElementById('lvGenero').value,autor:document.getElementById('lvAutor').value.trim(),secao:document.getElementById('lvSecao').value,localizacao:document.getElementById('lvLoc').value.trim(),observacoes:document.getElementById('lvObs').value.trim()};
 if(S.modal==='editLivro'){
+_stampUpdate(d);
 var h=await getAuthHeaders('return=representation');
 var r=await fetch(SUPABASE_URL+'/rest/v1/livros?id=eq.'+S.editItem,{method:'PATCH',headers:h,body:JSON.stringify(d)});
 if(r.ok){var up=await r.json();if(up.length){var idx=S.livros.findIndex(function(l){return l.id===S.editItem});if(idx>=0)S.livros[idx]=up[0]}}
 addHistDB('Livro editado: '+n)}else{
+_stampInsert(d);
 var h=await getAuthHeaders('return=representation');
 var r=await fetch(SUPABASE_URL+'/rest/v1/livros',{method:'POST',headers:h,body:JSON.stringify(d)});
 if(r.ok){var rows=await r.json();if(rows.length)S.livros.push(rows[0])}
