@@ -284,7 +284,7 @@ currentUser:null,activeTab:'dashboard',search:'',filterSecao:'',filterTipo:'',fi
 page:1,perPage:30,modal:null,editItem:null,editUser:null,editConsulente:null,
 filterGenero:'',filterTipoLivro:'',filterSecaoLivro:'',
 viewPessoaId:null,viewCicloId:null,viewConsId:null,viewVendaId:null,viewRitualId:null,
-history:[],toast:null,confirmText:'',confirmAction:null,notifications:[],
+history:[],toast:null,confirmText:'',confirmAction:null,notifications:[],pedidosExclusao:[],
 flowType:null,flowPessoaId:null,changeCount:0,
 reportPeriod:'mensal',reportStart:'',reportEnd:'',
 vendaItems:[{nome:'',qtd:1,valorUnit:0}],
@@ -451,6 +451,10 @@ function _user(){return (S.currentUser&&S.currentUser.username)||'desconhecido'}
 function _stampInsert(d){d.criado_por=_user();return d}
 function _stampUpdate(d){d.atualizado_em=new Date().toISOString();d.atualizado_por=_user();return d}
 function fmtDateTime(iso){if(!iso)return '';try{var d=new Date(iso);if(isNaN(d.getTime()))return '';return d.toLocaleDateString('pt-BR')+' '+d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}catch(e){return ''}}
+
+// Pedidos de exclusão: editor solicita, admin aprova ou rejeita
+function hasPedidoPendente(tipo,id){if(!S.pedidosExclusao)return false;return S.pedidosExclusao.some(function(p){return p.tipo===tipo&&p.registro_id===id&&p.status==='pendente'})}
+function getPedidosPendentes(){return (S.pedidosExclusao||[]).filter(function(p){return p.status==='pendente'})}
 function cicloToDB(c){return {id:c.id||undefined,pessoa_id:c.pessoaId||null,tipo:c.tipo||'',data_inicio:c.dataInicio||today(),data_fim:c.dataFim||null,status:c.status||'ativo',observacoes:c.observacoes||''}}
 function cicloFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,tipo:r.tipo||'',dataInicio:r.data_inicio||'',dataFim:r.data_fim||'',status:r.status||'ativo',observacoes:r.observacoes||''}}
 function interToDB(i){return {id:i.id||undefined,ciclo_id:i.cicloId||null,tipo:i.tipo||'',data:i.data||today(),descricao:i.descricao||'',valor:i.valor||'',forma_pagamento:i.formaPagamento||'',status:i.status||'',criado_por:i.criadoPor||''}}
@@ -674,6 +678,15 @@ try{
       }));
     }
   }catch(e){}
+
+  // ================= PEDIDOS DE EXCLUSÃO =================
+  try{
+    const rp = await sbGet('pedidos_exclusao','?order=solicitado_em.desc&limit=200');
+    if(rp.ok){
+      S.pedidosExclusao = await rp.json();
+      console.log('[LOAD] pedidos_exclusao', S.pedidosExclusao.length);
+    }
+  }catch(e){console.warn('pedidos_exclusao não carregou:',e.message)}
 
   _dbReady = true;
   _lastSyncStatus = 'ok';
@@ -976,12 +989,15 @@ function render(){
 var app=document.getElementById('app');
 if(!S.currentUser){app.innerHTML=renderLogin();bindLogin();return}
 var h=renderHeader();
-if(!hasRole(['viewer']))h+=renderQuickBar();
+if(!hasRole(['viewer','visualizador','editor']))h+=renderQuickBar();
 h+=renderTabs();
 var t=S.activeTab;
+// Guarda extra: se editor/visualizador caiu em aba não permitida, força volta pra Estoque
+if(S.currentUser&&S.currentUser.perfil==='editor'&&['gerenciar','biblioteca'].indexOf(t)<0){S.activeTab='gerenciar';t='gerenciar'}
+else if(S.currentUser&&(S.currentUser.perfil==='viewer'||S.currentUser.perfil==='visualizador')&&['busca','gerenciar','biblioteca'].indexOf(t)<0){S.activeTab='gerenciar';t='gerenciar'}
 if(t==='dashboard')h+=renderDashboard();
 else if(t==='busca')h+=renderSearch(false);
-else if(t==='gerenciar')h+=renderSearch(true);
+else if(t==='gerenciar')h+=renderSearch(!hasRole(['viewer','visualizador']));
 else if(t==='relatorios')h+=renderRelatorios();
 else if(t==='usuarios')h+=renderUsuarios();
 else if(t==='historico')h+=renderHistorico();
@@ -1003,7 +1019,7 @@ function renderLogin(){return '<div class="login-wrap"><div class="login-card"><
 function bindLogin(){var eb=document.getElementById('eyeBtn'),lp=document.getElementById('loginPass');if(eb)eb.onclick=function(){lp.type=lp.type==='password'?'text':'password'};document.getElementById('loginBtn').onclick=doLogin;document.getElementById('loginUser').onkeydown=function(e){if(e.key==='Enter')doLogin()};lp.onkeydown=function(e){if(e.key==='Enter')doLogin()}}
 async function doLogin(){var u=document.getElementById('loginUser').value.trim(),p=document.getElementById('loginPass').value;
 var user=await dbLogin(u,p);
-if(user){S.currentUser=user;S.activeTab='dashboard';addHistDB('Login');render();checkAlerts()}
+if(user){S.currentUser=user;S.activeTab=(user.perfil==='editor')?'gerenciar':((user.perfil==='viewer'||user.perfil==='visualizador')?'gerenciar':'dashboard');addHistDB('Login');render();checkAlerts()}
 else{document.getElementById('loginError').style.display='block'}}
 
 function renderHeader(){
@@ -1060,7 +1076,16 @@ function renderHeader(){
 
 function renderQuickBar(){return '<div class="quick-bar"><span style="font-size:13px;color:var(--text3);font-weight:500">Ações:</span>'+(hasRole(['admin','secretario','editor','babalawo','assistente'])?'<button class="btn btn-sm btn-success" onclick="startFlow(\'venda\')">+ Venda</button>':'')+(hasRole(['admin','secretario','babalawo'])?'<button class="btn btn-sm btn-purple" onclick="startFlow(\'consulta\')">+ Consulta</button>':'')+(hasRole(['admin','secretario','babalawo'])?'<button class="btn btn-sm btn-warning" onclick="startFlow(\'ritual\')">+ Ritual</button>':'')+'<button class="btn btn-sm btn-info" onclick="startFlow(\'buscar\')">Buscar Cliente</button></div>'}
 
-function renderTabs(){var tabs=[{key:'dashboard',label:'Dashboard'}];
+function renderTabs(){
+// Editor: somente Estoque + Biblioteca
+if(S.currentUser&&S.currentUser.perfil==='editor'){
+var et=[{key:'gerenciar',label:'Estoque'},{key:'biblioteca',label:'\uD83D\uDCDA Biblioteca'}];
+return '<div class="tabs">'+et.map(function(t){return '<button class="tab'+(S.activeTab===t.key?' active':'')+'" onclick="setTab(\''+t.key+'\')">'+t.label+'</button>'}).join('')+'</div>'}
+// Viewer/Visualizador: Busca + Estoque + Biblioteca (somente leitura)
+if(S.currentUser&&(S.currentUser.perfil==='viewer'||S.currentUser.perfil==='visualizador')){
+var vt=[{key:'busca',label:'Busca'},{key:'gerenciar',label:'Estoque'},{key:'biblioteca',label:'\uD83D\uDCDA Biblioteca'}];
+return '<div class="tabs">'+vt.map(function(t){return '<button class="tab'+(S.activeTab===t.key?' active':'')+'" onclick="setTab(\''+t.key+'\')">'+t.label+'</button>'}).join('')+'</div>'}
+var tabs=[{key:'dashboard',label:'Dashboard'}];
 if(hasRole(['admin','editor','viewer']))tabs.push({key:'busca',label:'Busca'});
 if(hasRole(['admin','editor']))tabs.push({key:'gerenciar',label:'Estoque'});
 if(hasRole(['admin','secretario','editor','babalawo','assistente']))tabs.push({key:'clientes',label:'Clientes'});
@@ -1107,6 +1132,7 @@ if(whatsLink)h+='<a href="'+whatsLink+'" target="_blank" class="btn btn-sm btn-s
 h+='<button class="btn btn-sm btn-outline" style="font-size:11px;padding:4px 8px" onclick="goPerfil('+p.id+')">Ver</button>';
 h+='</div></div>'});
 h+='</div></div>'}
+if(hasRole(['admin'])){var pp=getPedidosPendentes();if(pp.length){h+='<div class="chart-container" style="border-left:4px solid #F39C12"><div class="chart-title">⏳ Pedidos de Exclusão Pendentes ('+pp.length+')</div>';pp.slice(0,10).forEach(function(p){var snap=p.registro_snapshot||{};h+='<div style="padding:8px 10px;margin-bottom:6px;background:#FEF5E7;border-radius:6px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><div style="flex:1;min-width:200px"><div style="font-weight:600;font-size:13px">'+(p.tipo==='livro'?'📚 ':'📦 ')+esc(snap.nome||'')+'</div><div style="font-size:11px;color:var(--text2)">Por '+esc(p.solicitado_por||'')+' • '+fmtDateTime(p.solicitado_em)+'</div></div><button class="btn btn-sm btn-warning" onclick="openAprovarExclusao('+p.id+')">Revisar</button></div>'});h+='</div>'}}
 if(S.notifications.length){h+='<div class="chart-container"><div class="chart-title">Notificações Recentes</div>';S.notifications.slice(0,5).forEach(function(n){h+='<div style="padding:4px 10px;margin-bottom:3px;font-size:12px;color:var(--text2)">'+esc(n.tipo)+': '+esc(n.nome)+' \u2022 '+esc(n.time)+'</div>'});h+='</div>'}
 }
 // Kanban
@@ -1199,11 +1225,11 @@ if(atu){return '<div style="font-size:11px;line-height:1.3"><div style="color:va
 if(cri){return '<div style="font-size:11px;line-height:1.3"><div style="color:var(--text2)">'+fmtDateTime(cri)+'</div><div style="color:var(--text3);font-size:10px">'+esc(criP||'')+'</div></div>'}
 return '<span style="color:var(--text3);font-size:11px">—</span>'}
 
-function renderBibliotecaTable(pg,total){var pp=Math.ceil(total/S.perPage);var canEdit=hasRole(['admin','babalawo','assistente']);if(!pg.length)return '<div class="table-wrap"><div class="empty-state">Nenhum livro encontrado</div></div>';return '<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Nome</th><th>Autor</th><th>Tipo</th><th>Gênero</th><th>Seção</th><th>Local</th><th>Cadastrado</th>'+(canEdit?'<th>Ações</th>':'')+'</tr></thead><tbody>'+pg.map(function(l){return '<tr><td style="font-weight:500">'+esc(l.nome)+'</td><td>'+esc(l.autor)+'</td><td><span class="tipo-badge" style="background:var(--info-bg);color:var(--info)">'+esc(l.tipo)+'</span></td><td style="font-size:12px">'+esc(l.genero)+'</td><td style="font-size:12px">'+esc(l.secao)+'</td><td style="font-size:12px">'+esc(l.localizacao)+'</td><td>'+auditCell(l)+'</td>'+(canEdit?'<td><div class="actions-cell"><button class="edit-btn btn-sm" onclick="openEditLivro('+l.id+')">Editar</button><button class="del-btn btn-sm" onclick="confirmDelLivro('+l.id+')">X</button></div></td>':'')+'</tr>'}).join('')+'</tbody></table></div>'+(pp>1?renderPag(pp):'')+'</div>'}
+function renderBibliotecaTable(pg,total){var pp=Math.ceil(total/S.perPage);var canEdit=hasRole(['admin','babalawo','assistente','editor']);var isEditor=S.currentUser&&S.currentUser.perfil==='editor';if(!pg.length)return '<div class="table-wrap"><div class="empty-state">Nenhum livro encontrado</div></div>';return '<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Nome</th><th>Autor</th><th>Tipo</th><th>Gênero</th><th>Seção</th><th>Local</th><th>Cadastrado</th>'+(canEdit?'<th>Ações</th>':'')+'</tr></thead><tbody>'+pg.map(function(l){var pendente=hasPedidoPendente('livro',l.id);return '<tr'+(pendente?' style="opacity:.6"':'')+'><td style="font-weight:500">'+esc(l.nome)+(pendente?' <span style="background:#FEF5E7;color:#B9770E;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600">⏳ aguardando exclusão</span>':'')+'</td><td>'+esc(l.autor)+'</td><td><span class="tipo-badge" style="background:var(--info-bg);color:var(--info)">'+esc(l.tipo)+'</span></td><td style="font-size:12px">'+esc(l.genero)+'</td><td style="font-size:12px">'+esc(l.secao)+'</td><td style="font-size:12px">'+esc(l.localizacao)+'</td><td>'+auditCell(l)+'</td>'+(canEdit?'<td><div class="actions-cell"><button class="edit-btn btn-sm" onclick="openEditLivro('+l.id+')">Editar</button>'+(pendente?'':(isEditor?'<button class="del-btn btn-sm" style="background:#F39C12;color:#fff;border-color:#F39C12" onclick="solicitarExclusao(\'livro\','+l.id+')" title="Solicitar exclusão ao admin">⏳</button>':'<button class="del-btn btn-sm" onclick="confirmDelLivro('+l.id+')">X</button>'))+'</div></td>':'')+'</tr>'}).join('')+'</tbody></table></div>'+(pp>1?renderPag(pp):'')+'</div>'}
 
 function renderBiblioteca(){
 var fi=getFilteredLivros(),pg=paginate(fi);
-var canEdit=hasRole(['admin','babalawo','assistente']);
+var canEdit=hasRole(['admin','babalawo','assistente','editor']);
 var go=GENEROS_LIVRO.map(function(g){return '<option value="'+esc(g)+'"'+(S.filterGenero===g?' selected':'')+'>'+esc(g)+'</option>'}).join('');
 var to=TIPOS_LIVRO.map(function(t){return '<option value="'+esc(t)+'"'+(S.filterTipoLivro===t?' selected':'')+'>'+esc(t)+'</option>'}).join('');
 var so=SECOES_LIVRO.map(function(s){return '<option value="'+esc(s)+'"'+(S.filterSecaoLivro===s?' selected':'')+'>'+esc(s)+'</option>'}).join('');
@@ -1263,7 +1289,7 @@ return h}
 
 // === ESTOQUE / RELATÓRIOS / CLIENTES / PERFIL / CICLO (keeping same as v5) ===
 function renderSearch(ed){var fi=getFilteredItems(),pg=paginate(fi);var ab=ed?'<button class="btn btn-primary" onclick="openAddItem()">+ Item</button>':'';var so=SECOES.map(function(s){return '<option value="'+esc(s)+'"'+(S.filterSecao===s?' selected':'')+'>'+esc(s)+'</option>'}).join('');var to=TIPOS.map(function(t){return '<option value="'+esc(t)+'"'+(S.filterTipo===t?' selected':'')+'>'+esc(t)+'</option>'}).join('');return '<div class="search-section"><div class="search-bar"><input class="search-input" placeholder="Buscar item..." value="'+esc(S.search)+'" id="searchInput"><button class="btn btn-primary" onclick="doSearch()">Buscar</button>'+ab+'</div><div class="filters"><select onchange="S.filterSecao=this.value;S.page=1;render()"><option value="">Todas</option>'+so+'</select><select onchange="S.filterTipo=this.value;S.page=1;render()"><option value="">Todos</option>'+to+'</select></div><div class="result-count">'+fi.length+'</div></div>'+renderItemTable(pg,fi.length,ed)}
-function renderItemTable(it,tot,ed){if(!it.length)return '<div class="table-wrap"><div class="empty-state">Nenhum</div></div>';var pp=Math.ceil(tot/S.perPage);return '<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>#</th><th>Nome</th><th>Tipo</th><th>Seção</th><th>Local</th><th>Cadastrado</th>'+(ed?'<th>Ações</th>':'')+'</tr></thead><tbody>'+it.map(function(i){return '<tr><td>'+i.id+'</td><td style="font-weight:500">'+esc(i.nome)+'</td><td><span class="tipo-badge '+tipoClass(i.tipo)+'">'+esc(i.tipo)+'</span></td><td>'+esc(i.secao)+'</td><td>'+esc(i.localizacao)+'</td><td>'+auditCell(i)+'</td>'+(ed?'<td><div class="actions-cell"><button class="edit-btn btn-sm" onclick="openEditItem('+i.id+')">Editar</button><button class="del-btn btn-sm" onclick="confirmDel(\'item\','+i.id+')">X</button></div></td>':'')+'</tr>'}).join('')+'</tbody></table></div>'+(pp>1?renderPag(pp):'')+'</div>'}
+function renderItemTable(it,tot,ed){if(!it.length)return '<div class="table-wrap"><div class="empty-state">Nenhum</div></div>';var pp=Math.ceil(tot/S.perPage);var isEditor=S.currentUser&&S.currentUser.perfil==='editor';return '<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>#</th><th>Nome</th><th>Tipo</th><th>Seção</th><th>Local</th><th>Cadastrado</th>'+(ed?'<th>Ações</th>':'')+'</tr></thead><tbody>'+it.map(function(i){var pendente=hasPedidoPendente('item',i.id);return '<tr'+(pendente?' style="opacity:.6"':'')+'><td>'+i.id+'</td><td style="font-weight:500">'+esc(i.nome)+(pendente?' <span style="background:#FEF5E7;color:#B9770E;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600">⏳ aguardando exclusão</span>':'')+'</td><td><span class="tipo-badge '+tipoClass(i.tipo)+'">'+esc(i.tipo)+'</span></td><td>'+esc(i.secao)+'</td><td>'+esc(i.localizacao)+'</td><td>'+auditCell(i)+'</td>'+(ed?'<td><div class="actions-cell"><button class="edit-btn btn-sm" onclick="openEditItem('+i.id+')">Editar</button>'+(pendente?'':(isEditor?'<button class="del-btn btn-sm" style="background:#F39C12;color:#fff;border-color:#F39C12" onclick="solicitarExclusao(\'item\','+i.id+')" title="Solicitar exclusão ao admin">⏳</button>':'<button class="del-btn btn-sm" onclick="confirmDel(\'item\','+i.id+')">X</button>'))+'</div></td>':'')+'</tr>'}).join('')+'</tbody></table></div>'+(pp>1?renderPag(pp):'')+'</div>'}
 function renderPag(pp){var b='',s=Math.max(1,S.page-3),e=Math.min(pp,S.page+3);if(S.page>1)b+='<button class="page-btn" onclick="S.page='+(S.page-1)+';render()">\u2039</button>';for(var i=s;i<=e;i++)b+='<button class="page-btn'+(i===S.page?' active':'')+'" onclick="S.page='+i+';render()">'+i+'</button>';if(S.page<pp)b+='<button class="page-btn" onclick="S.page='+(S.page+1)+';render()">\u203A</button>';return '<div class="pagination">'+b+'</div>'}
 function renderRelatorios(){var bs={},bt={};SECOES.forEach(function(s){bs[s]=0});TIPOS.forEach(function(t){bt[t]=0});S.items.forEach(function(i){bs[i.secao]=(bs[i.secao]||0)+1;bt[i.tipo]=(bt[i.tipo]||0)+1});var mx=Math.max.apply(null,Object.values(bt).concat([1]));var cc='';SECOES.forEach(function(s){cc+='<div class="report-card"><div class="rc-label">'+esc(s)+'</div><div class="rc-value">'+(bs[s]||0)+'</div></div>'});var bars=TIPOS.map(function(t,i){return '<div class="bar-col"><div class="bar-value">'+(bt[t]||0)+'</div><div class="bar" style="height:'+Math.round((bt[t]/mx)*190)+'px;background:'+BAR_COLORS[i%BAR_COLORS.length]+'"></div><div class="bar-label">'+esc(t)+'</div></div>'}).join('');var cN=S.consulentes.filter(function(c){return (c.tipoConsulta||'normal')==='normal'});var cU=S.consulentes.filter(function(c){return c.tipoConsulta==='urgencia'});var tC=S.consulentes.length,cobN=0,recN=0,cobU=0,recU=0;cN.forEach(function(c){cobN+=consValorCobrado(c);recN+=consValorRecebido(c)});cU.forEach(function(c){cobU+=consValorCobrado(c);recU+=consValorRecebido(c)});var cobT=cobN+cobU,recT=recN+recU;var ch='<div class="chart-container"><div class="chart-title">Consultas por Tipo</div><div class="report-cards" style="margin-bottom:12px">';ch+='<div class="report-card" style="border-left-color:var(--accent)"><div class="rc-label">Total Consultas</div><div class="rc-value">'+tC+'</div><div class="rc-sub">Cobrado: R$'+cobT.toFixed(2)+'</div></div>';ch+='<div class="report-card" style="border-left-color:var(--info)"><div class="rc-label">Normal</div><div class="rc-value">'+cN.length+'</div><div class="rc-sub">Cobrado: R$'+cobN.toFixed(2)+'</div></div>';ch+='<div class="report-card" style="border-left-color:var(--danger)"><div class="rc-label">Urgência</div><div class="rc-value">'+cU.length+'</div><div class="rc-sub">Cobrado: R$'+cobU.toFixed(2)+'</div></div>';ch+='<div class="report-card" style="border-left-color:var(--success)"><div class="rc-label">Total Recebido</div><div class="rc-value">R$'+recT.toFixed(0)+'</div><div class="rc-sub">Normal: R$'+recN.toFixed(2)+' | Urgência: R$'+recU.toFixed(2)+'</div></div>';ch+='</div>';ch+='<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Tipo</th><th>Qtd</th><th>Cobrado</th><th>Recebido</th><th>Ticket Médio</th></tr></thead><tbody>';ch+='<tr><td style="font-weight:500">Normal</td><td>'+cN.length+'</td><td>R$'+cobN.toFixed(2)+'</td><td>R$'+recN.toFixed(2)+'</td><td>R$'+(cN.length?cobN/cN.length:0).toFixed(2)+'</td></tr>';ch+='<tr><td style="font-weight:500">Urgência</td><td>'+cU.length+'</td><td>R$'+cobU.toFixed(2)+'</td><td>R$'+recU.toFixed(2)+'</td><td>R$'+(cU.length?cobU/cU.length:0).toFixed(2)+'</td></tr>';ch+='<tr style="font-weight:700;background:var(--accent-bg)"><td>TOTAL</td><td>'+tC+'</td><td>R$'+cobT.toFixed(2)+'</td><td>R$'+recT.toFixed(2)+'</td><td>R$'+(tC?cobT/tC:0).toFixed(2)+'</td></tr>';ch+='</tbody></table></div></div></div>';return ch+'<div class="chart-container"><div class="chart-title">Itens por Seção</div><div class="report-cards">'+cc+'</div></div><div class="chart-container"><div class="chart-title">Itens por Tipo</div><div class="bar-chart">'+bars+'</div></div>'}
 
@@ -1343,7 +1369,7 @@ if(m==='flowConsulta')return mFlowConsulta();
 if(m==='flowRitual')return mFlowRitual();
 if(m==='gestaoItens')return mGestaoItens();
 if(m==='addCiclo')return mAddCiclo();if(m==='addInter'||m==='editInter')return mInter();
-if(m==='rastreio')return mRastreio();if(m==='definirFrete')return mDefinirFrete();if(m==='confirmConsulta')return mConfirmConsulta();if(m==='changeConsPag')return mChangeConsPag();
+if(m==='rastreio')return mRastreio();if(m==='definirFrete')return mDefinirFrete();if(m==='aprovarExclusao')return mAprovarExclusao();if(m==='confirmConsulta')return mConfirmConsulta();if(m==='changeConsPag')return mChangeConsPag();
 if(m==='addCrediario')return mAddCrediario();if(m==='pagCrediario')return mPagCrediario();
 if(m==='addLivro'||m==='editLivro')return mLivro();
 return ''}
@@ -1592,6 +1618,25 @@ return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Definir Frete 
 '<div class="form-group"><label>Valor do frete</label>'+currencyInput('dfValor',parseFloat(v.valorFrete)||0,'0,00','')+'</div>'+
 '<div style="font-size:11px;color:var(--text2);margin-bottom:12px">O valor será somado ao subtotal do pedido. Escolha <strong>Retirada</strong> se o cliente for buscar pessoalmente (valor = 0).</div>'+
 '<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveDefinirFrete()">Salvar</button></div></div></div>'}
+
+function mAprovarExclusao(){
+var pid=S.viewPedidoExclusao;
+var p=(S.pedidosExclusao||[]).find(function(x){return x.id===pid});
+if(!p)return '';
+var snap=p.registro_snapshot||{};
+var tipoLabel=p.tipo==='livro'?'Livro':'Item de Estoque';
+var detalhes='<div style="background:var(--bg2);padding:10px;border-radius:var(--radius);margin-bottom:12px;font-size:13px">';
+detalhes+='<div><strong>Tipo:</strong> '+tipoLabel+'</div>';
+detalhes+='<div><strong>Nome:</strong> '+esc(snap.nome||'')+'</div>';
+if(snap.autor)detalhes+='<div><strong>Autor:</strong> '+esc(snap.autor)+'</div>';
+if(snap.tipo)detalhes+='<div><strong>Categoria:</strong> '+esc(snap.tipo)+'</div>';
+if(snap.secao)detalhes+='<div><strong>Seção:</strong> '+esc(snap.secao)+'</div>';
+if(snap.localizacao)detalhes+='<div><strong>Local:</strong> '+esc(snap.localizacao)+'</div>';
+detalhes+='</div>';
+var meta='<div style="font-size:12px;color:var(--text2);margin-bottom:12px"><strong>Solicitado por:</strong> '+esc(p.solicitado_por||'')+'<br><strong>Em:</strong> '+fmtDateTime(p.solicitado_em)+(p.motivo?'<br><strong>Motivo:</strong> '+esc(p.motivo):'')+'</div>';
+return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Aprovar Exclusão</h3>'+detalhes+meta+
+'<div style="background:#FDEDEC;color:#922B21;padding:10px;border-radius:6px;font-size:12px;margin-bottom:12px">⚠ Aprovar removerá o registro permanentemente do banco. Essa ação não pode ser desfeita.</div>'+
+'<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Fechar</button><button class="btn" style="background:#C0392B;color:#fff" onclick="rejeitarExclusao()">Rejeitar</button><button class="btn btn-success" onclick="aprovarExclusao()">Aprovar e Excluir</button></div></div></div>'}
 function mAddCrediario(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Novo Crediário</h3><div class="form-group"><label>Cliente</label><select id="crCliente">'+S.pessoas.map(function(p){return '<option value="'+p.id+'">'+esc(p.nome)+'</option>'}).join('')+'</select></div><div class="form-group"><label>Descrição</label><textarea id="crDesc" rows="2"></textarea></div><div class="form-group"><label>Valor Total</label>'+currencyInput('crValor',0,'0,00','')+'</div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveCrediario()">Criar</button></div></div></div>'}
 function mPagCrediario(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Pagamento</h3><div class="form-group"><label>Valor</label>'+currencyInput('pgVal',0,'0,00','')+'</div><div class="form-group"><label>Forma</label><select id="pgForma"><option>pix</option><option>cartao</option><option>dinheiro</option><option>transferencia</option></select></div><div class="form-group"><label>Comprovante</label><input type="file" id="pgComp" accept="image/*"></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="savePagCrediario()">Registrar</button></div></div></div>'}
 
@@ -1607,13 +1652,74 @@ return '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide"><h3>'+(
 '<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveLivro()">Salvar</button></div></div></div>'}
 
 // ==================== ALL ACTIONS ====================
-window.setTab=function(t){S.activeTab=t;S.search='';S.filterSecao='';S.filterTipo='';S.filterStatus='';S.filterGenero='';S.filterTipoLivro='';S.filterSecaoLivro='';S.page=1;render()};
+window.setTab=function(t){
+// Guarda permissões: editor e visualizador só podem navegar nas tabs permitidas
+if(S.currentUser&&S.currentUser.perfil==='editor'){
+if(['gerenciar','biblioteca'].indexOf(t)<0){toast('Acesso restrito','error');return}}
+else if(S.currentUser&&(S.currentUser.perfil==='viewer'||S.currentUser.perfil==='visualizador')){
+if(['busca','gerenciar','biblioteca'].indexOf(t)<0){toast('Acesso restrito','error');return}}
+S.activeTab=t;S.search='';S.filterSecao='';S.filterTipo='';S.filterStatus='';S.filterGenero='';S.filterTipoLivro='';S.filterSecaoLivro='';S.page=1;render()};
 window.doLogout=async function(){addHistDB('Logout');await authSignOut();S.currentUser=null;render()};
 window.doSearch=function(){var si=document.getElementById('searchInput');if(si)S.search=si.value;S.page=1;render()};
 window.closeModal=function(){S.modal=null;S.editItem=null;S.editUser=null;S.editConsulente=null;S.confirmText='';S.confirmAction=null;S.flowType=null;S.flowPessoaId=null;render()};
 
 window.openAddItem=function(){S.editItem=null;S.modal='addItem';render()};
 window.openEditItem=function(id){S.editItem=S.items.find(function(i){return i.id===id});S.modal='editItem';render()};
+
+// === FLUXO DE EXCLUSÃO COM APROVAÇÃO (editor solicita, admin aprova) ===
+
+window.solicitarExclusao=async function(tipo,id){
+var rec=tipo==='livro'?S.livros.find(function(x){return x.id===id}):S.items.find(function(x){return x.id===id});
+if(!rec)return toast('Registro não encontrado','error');
+if(hasPedidoPendente(tipo,id))return toast('Já existe pedido pendente para esse registro','info');
+var motivo=prompt('Justifique o pedido de exclusão (opcional):\n\n'+(tipo==='livro'?'Livro: ':'Item: ')+rec.nome,'')||'';
+if(motivo===null)return; // cancelado
+var payload={tipo:tipo,registro_id:id,registro_snapshot:rec,motivo:motivo,status:'pendente',solicitado_por:_user()};
+var inserted=await insertRecord('pedidos_exclusao',payload);
+if(!inserted){toast('Falha ao registrar pedido','error');return}
+S.pedidosExclusao=S.pedidosExclusao||[];
+S.pedidosExclusao.unshift(inserted);
+addHistDB('Pedido de exclusão: '+(tipo==='livro'?'Livro':'Item')+' "'+rec.nome+'"');
+toast('Pedido enviado ao administrador!');
+render()};
+
+window.openAprovarExclusao=function(pedidoId){S.viewPedidoExclusao=pedidoId;S.modal='aprovarExclusao';render()};
+
+window.aprovarExclusao=async function(){
+var pid=S.viewPedidoExclusao;
+var p=(S.pedidosExclusao||[]).find(function(x){return x.id===pid});
+if(!p)return toast('Pedido não encontrado','error');
+// Executa exclusão do registro
+var ok=false;
+if(p.tipo==='livro'){
+var h=await getAuthHeaders();
+var r=await fetch(SUPABASE_URL+'/rest/v1/livros?id=eq.'+p.registro_id,{method:'DELETE',headers:h});
+ok=r.ok;
+if(ok)S.livros=S.livros.filter(function(x){return x.id!==p.registro_id})}
+else if(p.tipo==='item'){
+ok=await deleteRecord('items',p.registro_id);
+if(ok)S.items=S.items.filter(function(x){return x.id!==p.registro_id})}
+if(!ok){toast('Falha ao excluir registro','error');return}
+// Atualiza pedido
+var update={status:'aprovado',decidido_por:_user(),decidido_em:new Date().toISOString()};
+var saved=await saveRecord('pedidos_exclusao',pid,update);
+if(saved)Object.assign(p,update);
+addHistDB('Aprovou exclusão: '+(p.registro_snapshot&&p.registro_snapshot.nome||''));
+toast('Exclusão aprovada e executada');
+closeModal()};
+
+window.rejeitarExclusao=async function(){
+var pid=S.viewPedidoExclusao;
+var p=(S.pedidosExclusao||[]).find(function(x){return x.id===pid});
+if(!p)return toast('Pedido não encontrado','error');
+var obs=prompt('Motivo da rejeição (opcional):','')||'';
+var update={status:'rejeitado',decidido_por:_user(),decidido_em:new Date().toISOString(),observacao_decisao:obs};
+var saved=await saveRecord('pedidos_exclusao',pid,update);
+if(saved)Object.assign(p,update);
+addHistDB('Rejeitou exclusão: '+(p.registro_snapshot&&p.registro_snapshot.nome||''));
+toast('Pedido rejeitado');
+closeModal()};
+
 window.saveItem=async function(){var n=document.getElementById('mNome').value.trim();var err=validateText(n,2,300,'Nome do item');if(err)return toast(err,'error');var d={nome:n,tipo:document.getElementById('mTipo').value,secao:document.getElementById('mSecao').value,localizacao:document.getElementById('mLoc').value.trim()};if(S.editItem){var dbPayload=_stampUpdate(itemToDB(d));var ok=await saveRecord('items',S.editItem.id,dbPayload);if(ok){Object.assign(S.editItem,d,{atualizadoEm:dbPayload.atualizado_em,atualizadoPor:dbPayload.atualizado_por});addHistDB('Item editado: '+n);toast('OK!')}else{toast('Falha ao salvar','error')}}else{var dbNew=_stampInsert(itemToDB(d));var inserted=await insertRecord('items',dbNew);if(inserted){d.id=inserted.id;d.criadoEm=inserted.criado_em||new Date().toISOString();d.criadoPor=inserted.criado_por||_user();S.items.push(d);addHistDB('+ Item: '+n);toast('OK!')}else{toast('Falha ao criar item','error')}}closeModal()};
 
 window.openAddPessoa=function(){S.editItem=null;S.modal='addPessoa';render()};
