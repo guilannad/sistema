@@ -1165,7 +1165,7 @@ return h}
 
 // === BIBLIOTECA ===
 var GENEROS_LIVRO=["Candomblé","Culto Tradicional Yoruba (CTY)","Demonologia e satanismo","Desenvolvimento pessoal e sucesso","Espiritismo","Espiritualidade geral","Estratégia, poder e manipulação","Filosofia","Hipnose e hipnoterapia","Magia e feitiçaria","Mitologia","Negócios, dinheiro e marketing","Neurociência e mente","Ocultismo e esoterismo","PNL","Persuasão, influência e linguagem corporal","Psicologia","Religiões afro-diaspóricas sincréticas","Religiões comparadas","Saúde natural e terapias alternativas"];
-var TIPOS_LIVRO=["Livro","Apostila","Revista"];
+var TIPOS_LIVRO=["Livro","Apostila","Revista","Caderno"];
 var SECOES_LIVRO=["Sala de Consulta do Bàbá","Prateleira das Esculturas","Prateleira dos Insumos","Estante com Medicinas perto do Banheiro","Estante com Apostilas perto do Banheiro","Andar de Cima"];
 
 function getFilteredLivros(){var li=S.livros.slice();if(S.filterGenero)li=li.filter(function(l){return l.genero===S.filterGenero});if(S.filterTipoLivro)li=li.filter(function(l){return l.tipo===S.filterTipoLivro});if(S.filterSecaoLivro)li=li.filter(function(l){return l.secao===S.filterSecaoLivro});if(S.search.trim())li=li.filter(function(l){return fuzzy(S.search,l.nome+' '+l.autor+' '+l.genero+' '+l.secao)});return li}
