@@ -1120,7 +1120,19 @@ if(S.modal)h+=renderModal();
 if(S.toast)h+='<div class="toast toast-'+S.toast.type+'">'+esc(S.toast.msg)+'</div>';
 app.innerHTML=h;bindAll()}
 
-function renderLogin(){return '<div class="login-wrap"><div class="login-card"><span style="font-size:42px;display:block;margin-bottom:12px">\u{1F3DB}\uFE0F</span><h1 style="font-family:Playfair Display,serif;font-size:26px;color:var(--accent)">Ilé Ifagbemi Brasil</h1><p style="color:var(--text2);font-size:14px;margin-bottom:28px">Sistema de Gestão</p><div class="login-error" id="loginError">Usuário ou senha incorretos</div><div class="form-group"><label>Usuário</label><div class="input-wrap"><input type="text" id="loginUser" placeholder="Seu usuário"></div></div><div class="form-group"><label>Senha</label><div class="input-wrap"><input type="password" id="loginPass" placeholder="Sua senha"><button class="eye-btn" id="eyeBtn">\u{1F441}\uFE0F</button></div></div><button class="btn btn-primary login-btn" id="loginBtn" style="width:100%;padding:12px;font-size:15px;font-weight:600;margin-top:8px">Entrar</button></div></div>'}
+function renderLogin(){return '<div class="login-wrap"><div class="login-card"><span style="font-size:42px;display:block;margin-bottom:12px">\u{1F3DB}\uFE0F</span><h1 style="font-family:Playfair Display,serif;font-size:26px;color:var(--accent)">Ilé Ifagbemi Brasil</h1><p style="color:var(--text2);font-size:14px;margin-bottom:28px">Sistema de Gestão</p><div class="login-error" id="loginError">Usuário ou senha incorretos</div><div class="form-group"><label>Usuário</label><div class="input-wrap"><input type="text" id="loginUser" placeholder="Seu usuário"></div></div><div class="form-group"><label>Senha</label><div class="input-wrap"><input type="password" id="loginPass" placeholder="Sua senha"><button class="eye-btn" id="eyeBtn">\u{1F441}\uFE0F</button></div></div><button class="btn btn-primary login-btn" id="loginBtn" style="width:100%;padding:12px;font-size:15px;font-weight:600;margin-top:8px">Entrar</button><div style="text-align:center;margin-top:16px"><a href="#" onclick="esqueciSenha();return false" style="color:var(--accent);font-size:13px;text-decoration:none">Esqueci minha senha</a></div></div></div>'}
+
+window.esqueciSenha=async function(){
+var email=prompt('Digite seu email cadastrado para receber o link de redefinição de senha:','');
+if(!email)return;
+email=email.trim().toLowerCase();
+if(!email||email.indexOf('@')<0)return alert('Email inválido');
+if(!_sb)return alert('Sistema não inicializado');
+try{
+  var r=await _sb.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+window.location.pathname});
+  if(r.error){alert('Erro: '+r.error.message);console.error('[RESET PASSWORD]',r.error);return}
+  alert('Pronto! Verifique seu email '+email+'.\n\nO link de redefinição pode demorar alguns minutos para chegar e às vezes cai no spam.');
+}catch(e){alert('Falha ao enviar: '+e.message);console.error('[RESET PASSWORD]',e)}};
 function bindLogin(){var eb=document.getElementById('eyeBtn'),lp=document.getElementById('loginPass');if(eb)eb.onclick=function(){lp.type=lp.type==='password'?'text':'password'};document.getElementById('loginBtn').onclick=doLogin;document.getElementById('loginUser').onkeydown=function(e){if(e.key==='Enter')doLogin()};lp.onkeydown=function(e){if(e.key==='Enter')doLogin()}}
 async function doLogin(){var u=document.getElementById('loginUser').value.trim(),p=document.getElementById('loginPass').value;
 var user=await dbLogin(u,p);
@@ -1471,18 +1483,18 @@ function renderUsuarios(){
 var perfis=['admin','babalawo','secretario','assistente','editor','visualizador'];
 var h='<div style="background:#FEF5E7;border-left:4px solid #F39C12;padding:12px 16px;border-radius:var(--radius);margin-bottom:16px;font-size:13px;line-height:1.5">';
 h+='<strong>⚠ Gerenciamento simplificado</strong><br>';
-h+='Esta tela define apenas o <strong>perfil de aplicação</strong> (admin, editor, visualizador, etc) de cada usuário.<br>';
-h+='Para <strong>criar logins, redefinir senhas, suspender contas ou remover usuários</strong>, use o painel do Supabase: <em>Authentication → Users</em>.';
+h+='Esta tela define apenas o <strong>perfil de aplicação</strong> (admin, editor, visualizador, etc).<br>';
+h+='Para <strong>criar logins ou remover usuários</strong>, use o painel do Supabase: <em>Authentication → Users</em>.<br>';
+h+='Para <strong>redefinir senha</strong>, o próprio usuário deve usar a opção "Esqueci minha senha" na tela de login.';
 h+='</div>';
 h+='<div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="openAddUser()">+ Vincular Perfil</button><button class="btn btn-outline" onclick="loadUsuarios()">Atualizar Lista</button></div>';
 if(!S._authUsers||!S._authUsers.length){h+='<div class="empty-state">Nenhum perfil cadastrado.<br><button class="btn btn-sm btn-info" onclick="loadUsuarios()">Carregar</button></div>';return h}
-h+='<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Username</th><th>Perfil</th><th>Email</th><th>Ações</th></tr></thead><tbody>';
+h+='<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Username</th><th>Perfil</th><th>Email</th></tr></thead><tbody>';
 S._authUsers.forEach(function(u){
 var opts=perfis.map(function(p){return '<option value="'+p+'"'+(u.perfil===p?' selected':'')+'>'+p+'</option>'}).join('');
 h+='<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="user-avatar avatar-'+u.perfil+'" style="width:32px;height:32px;font-size:13px">'+((u.username||'?')[0]).toUpperCase()+'</div><strong>'+esc(u.username||'')+'</strong></div></td>';
 h+='<td><select onchange="alterarPerfil(\''+esc(u.username)+'\',this.value)" style="padding:4px 8px;font-size:13px">'+opts+'</select></td>';
-h+='<td style="font-size:12px;color:var(--text2)">'+esc(u.email||'')+'</td>';
-h+='<td><button class="btn btn-sm btn-outline" onclick="openChgPwd(\''+esc(u.username)+'\')">Nova Senha</button></td></tr>'});
+h+='<td style="font-size:12px;color:var(--text2)">'+esc(u.email||'')+'</td></tr>'});
 h+='</tbody></table></div></div>';
 return h}
 
