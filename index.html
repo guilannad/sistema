@@ -478,8 +478,8 @@ function pessoaToDB(p){return {id:p.id||undefined,nome:p.nome,nome_mae:p.nomeMae
 function pessoaFromDB(r){return {id:r.id,nome:r.nome,nomeMae:r.nome_mae||'',telefone:r.telefone||'',email:r.email||'',dataNascimento:r.data_nascimento||'',origem:r.origem||'',observacoes:r.observacoes||'',foto:r.foto||'',logradouro:r.logradouro||'',numero:r.numero||'',complemento:r.complemento||'',bairro:r.bairro||'',cidade:r.cidade||'',estado:r.estado||'',cep:r.cep||'',pais:r.pais||'Brasil',dataCriacao:r.created_at?r.created_at.slice(0,10):today()}}
 function consToDB(c){return {id:c.id||undefined,pessoa_id:c.pessoaId||null,nome_completo:c.nomeCompleto,nome_mae:c.nomeMae||'',data_nascimento:c.dataNascimento||null,telefone_whatsapp:c.telefoneWhatsApp||'',data_consulta:c.dataConsulta||null,horario_consulta:c.horarioConsulta||'',formato_consulta:c.formatoConsulta||'',origem:c.origem||'',tipo_consulta:c.tipoConsulta||'normal',forma_pagamento:c.formaPagamento||'',valor_cobrado:c.valorCobrado||0,valor_recebido:c.valorRecebido||0,status_pagamento:c.statusPagamento||'pendente',status_fluxo:c.statusFluxo||'aguardando_consulta',logradouro:c.logradouro||'',numero:c.numero||'',complemento:c.complemento||'',bairro:c.bairro||'',cidade:c.cidade||'',estado:c.estado||'',cep:c.cep||'',pais:c.pais||'Brasil',odu_resultado:c.oduResultado||'',odu_descricao:c.oduDescricao||'',consideracoes_gerais:c.consideracoesGerais||'',prescricao_rituais:c.prescricaoRituais||'',prescricao_medicinas:c.prescricaoMedicinas||'',observacoes_prescricao:c.observacoesPrescricao||'',prescricao_ebos:normalizeItems(c.prescricaoEbos,'ebo'),prescricao_medicinas_itens:normalizeItems(c.prescricaoMedicinasItens,'medicina'),registro_pagamentos:c.registroPagamentos||[],comprovante:c.comprovante||''}}
 function consFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,nomeCompleto:r.nome_completo,nomeMae:r.nome_mae||'',dataNascimento:r.data_nascimento||'',telefoneWhatsApp:r.telefone_whatsapp||'',dataConsulta:r.data_consulta||'',horarioConsulta:r.horario_consulta||'',formatoConsulta:r.formato_consulta||'',origem:r.origem||'',tipoConsulta:r.tipo_consulta||'normal',formaPagamento:r.forma_pagamento||'',valorCobrado:r.valor_cobrado||0,valorRecebido:r.valor_recebido||0,statusPagamento:r.status_pagamento||'pendente',statusFluxo:r.status_fluxo||'aguardando_consulta',logradouro:r.logradouro||'',numero:r.numero||'',complemento:r.complemento||'',bairro:r.bairro||'',cidade:r.cidade||'',estado:r.estado||'',cep:r.cep||'',pais:r.pais||'Brasil',oduResultado:r.odu_resultado||'',oduDescricao:r.odu_descricao||'',consideracoesGerais:r.consideracoes_gerais||'',prescricaoRituais:r.prescricao_rituais||'',prescricaoMedicinas:r.prescricao_medicinas||'',observacoesPrescricao:r.observacoes_prescricao||'',prescricaoEbos:normalizeItems(r.prescricao_ebos,'ebo'),prescricaoMedicinasItens:normalizeItems(r.prescricao_medicinas_itens,'medicina'),registroPagamentos:r.registro_pagamentos||[],comprovante:r.comprovante||''}}
-function vendaToDB(v){return {id:v.id||undefined,pessoa_id:v.pessoaId||null,data:v.data||today(),itens:v.itens||[],subtotal:v.subtotal||0,valor_frete:v.valorFrete||0,total_com_frete:v.totalComFrete||0,tipo_frete:v.tipoFrete||'',forma_pagamento:v.formaPagamento||'',status:v.status||'pedido_feito',codigo_rastreio:v.codigoRastreio||'',comprovante:v.comprovante||''}}
-function vendaFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,data:r.data||'',itens:r.itens||[],subtotal:r.subtotal||0,valorFrete:r.valor_frete||0,totalComFrete:r.total_com_frete||0,tipoFrete:r.tipo_frete||'',formaPagamento:r.forma_pagamento||'',status:r.status||'pedido_feito',codigoRastreio:r.codigo_rastreio||'',comprovante:r.comprovante||''}}
+function vendaToDB(v){return {id:v.id||undefined,pessoa_id:v.pessoaId||null,data:v.data||today(),itens:v.itens||[],subtotal:v.subtotal||0,valor_frete:v.valorFrete||0,total_com_frete:v.totalComFrete||0,tipo_frete:v.tipoFrete||'',forma_pagamento:v.formaPagamento||'',status:v.status||'pedido_feito',codigo_rastreio:v.codigoRastreio||'',comprovante:v.comprovante||'',arquivado:v.arquivado||false}}
+function vendaFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,data:r.data||'',itens:r.itens||[],subtotal:r.subtotal||0,valorFrete:r.valor_frete||0,totalComFrete:r.total_com_frete||0,tipoFrete:r.tipo_frete||'',formaPagamento:r.forma_pagamento||'',status:r.status||'pedido_feito',codigoRastreio:r.codigo_rastreio||'',comprovante:r.comprovante||'',arquivado:r.arquivado||false}}
 
 // Mappers items (estoque) com auditoria
 function itemToDB(i){return {id:i.id||undefined,nome:i.nome||'',tipo:i.tipo||'',secao:i.secao||'',localizacao:i.localizacao||'',observacoes:i.observacoes||''}}
@@ -1045,7 +1045,6 @@ else if(t==='clientes')h+=renderClientes();
 else if(t==='perfil_cliente')h+=renderPerfilCliente();
 else if(t==='detalhe_ciclo')h+=renderDetalheCiclo();
 else if(t==='rel_vendas')h+=renderRelVendas();
-else if(t==='backup')h+=renderBackup();
 else if(t==='prescricao_page')h+=renderPrescricaoPage();
 else if(t==='dashboard_vendas')h+=renderDashboardVendas();
 else if(t==='crediario')h+=renderCrediario();
@@ -1136,7 +1135,6 @@ if(hasRole(['admin','secretario','editor','babalawo','assistente']))tabs.push({k
 if(hasRole(['admin','secretario','babalawo','assistente']))tabs.push({key:'dashboard_vendas',label:'Vendas'});
 if(hasRole(['admin','secretario','babalawo']))tabs.push({key:'crediario',label:'Crediário'});
 if(hasRole(['admin']))tabs.push({key:'rel_vendas',label:'Relatórios'});
-if(hasRole(['admin']))tabs.push({key:'backup',label:'Backup'});
 if(hasRole(['admin']))tabs.push({key:'usuarios',label:'Usuários'});
 tabs.push({key:'biblioteca',label:'\uD83D\uDCDA Biblioteca'});
 if(hasRole(['admin','secretario','babalawo']))tabs.push({key:'historico',label:'Histórico'});
@@ -1233,25 +1231,53 @@ return h+k}
 
 // === DASHBOARD VENDAS ===
 function renderDashboardVendas(){
-var bv={};STATUS_VENDA.forEach(function(s){bv[s.key]=[]});S.vendas.forEach(function(v){if(bv[v.status])bv[v.status].push(v)});
-var h='<div class="report-cards">';STATUS_VENDA.forEach(function(s){h+='<div class="report-card" style="border-left-color:'+s.color+'"><div class="rc-label">'+s.label+'</div><div class="rc-value">'+bv[s.key].length+'</div></div>'});h+='</div>';
+var mostrarArq=S.mostrarVendasArquivadas||false;
+var vendasVisiveis=S.vendas.filter(function(v){return mostrarArq?v.arquivado===true:v.arquivado!==true});
+var totalArq=S.vendas.filter(function(v){return v.arquivado===true}).length;
+var bv={};STATUS_VENDA.forEach(function(s){bv[s.key]=[]});vendasVisiveis.forEach(function(v){if(bv[v.status])bv[v.status].push(v)});
+var h='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">';
+h+='<div style="font-size:13px;color:var(--text2)">'+(mostrarArq?'📦 Mostrando '+totalArq+' venda(s) arquivada(s)':'Vendas ativas (arquivadas estão ocultas: '+totalArq+')')+'</div>';
+h+='<button class="btn btn-sm btn-outline" onclick="S.mostrarVendasArquivadas='+(!mostrarArq)+';render()">'+(mostrarArq?'← Voltar para ativas':'Mostrar arquivadas ('+totalArq+')')+'</button>';
+h+='</div>';
+h+='<div class="report-cards">';STATUS_VENDA.forEach(function(s){h+='<div class="report-card" style="border-left-color:'+s.color+'"><div class="rc-label">'+s.label+'</div><div class="rc-value">'+bv[s.key].length+'</div></div>'});h+='</div>';
 h+='<div class="kanban-grid">';STATUS_VENDA.forEach(function(s){
 h+='<div class="kanban-col"><div class="kanban-header">'+esc(s.label)+'<span class="kanban-count">'+bv[s.key].length+'</span></div>';
 bv[s.key].forEach(function(v){var p=getPessoa(v.pessoaId);
 var freteIndefinido=!v.tipoFrete||v.tipoFrete==='a_definir'||v.tipoFrete===''||(!v.valorFrete&&v.tipoFrete!=='retirada');
-h+='<div class="kanban-card" style="border-left-color:'+s.color+(freteIndefinido&&s.key!=='cancelado'&&s.key!=='concluido'?';box-shadow:inset 0 0 0 1px #F39C12':'')+'"><h4>#'+v.id+' '+esc(p?p.nome:'')+'</h4><div class="kc-sub">'+fmtDate(v.data)+' \u2022 R$'+(v.totalComFrete||0).toFixed(2)+' \u2022 '+freteLabel(v.tipoFrete||'a_definir')+'</div>';
+h+='<div class="kanban-card" style="border-left-color:'+s.color+(freteIndefinido&&s.key!=='cancelado'&&s.key!=='concluido'?';box-shadow:inset 0 0 0 1px #F39C12':'')+(v.arquivado?';opacity:.7':'')+'"><h4>#'+v.id+' '+esc(p?p.nome:'')+(v.arquivado?' <span style="background:#E8E8E8;color:#555;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600">📦 ARQUIVADA</span>':'')+'</h4><div class="kc-sub">'+fmtDate(v.data)+' \u2022 R$'+(v.totalComFrete||0).toFixed(2)+' \u2022 '+freteLabel(v.tipoFrete||'a_definir')+'</div>';
 if(freteIndefinido&&s.key!=='cancelado'&&s.key!=='concluido')h+='<div style="background:#FEF5E7;color:#B9770E;padding:4px 8px;border-radius:4px;font-size:11px;font-weight:600;margin-bottom:4px;display:inline-block">\u26A0 Frete a definir</div>';
 if(v.itens)v.itens.forEach(function(it){h+='<div style="font-size:11px;color:var(--text2)">'+it.qtd+'x '+esc(it.nome)+' R$'+it.valorTotal.toFixed(2)+'</div>'});
 if(v.codigoRastreio)h+='<div style="font-size:11px;margin-top:4px"><strong>Rastreio:</strong> '+esc(v.codigoRastreio)+'</div>';
 h+='<div class="kc-actions">';
 var vi=STATUS_VENDA.findIndex(function(x){return x.key===s.key});
+if(!v.arquivado){
 if(vi>0&&s.key!=='cancelado')h+='<button class="btn btn-sm btn-outline" onclick="moveVenda('+v.id+',-1)">\u25C0</button>';
 if(vi<3&&s.key!=='concluido'&&s.key!=='cancelado')h+='<button class="btn btn-sm btn-success" onclick="moveVenda('+v.id+',1)">Avançar</button>';
 if(freteIndefinido&&s.key!=='cancelado'&&s.key!=='concluido')h+='<button class="btn btn-sm" style="background:#F39C12;color:#fff" onclick="openDefinirFrete('+v.id+')">Definir Frete</button>';
 if(s.key==='embalando')h+='<button class="btn btn-sm btn-info" onclick="addRastreio('+v.id+')">Rastreio</button>';
+if(s.key==='concluido'||s.key==='cancelado')h+='<button class="btn btn-sm" style="background:#7F8C8D;color:#fff" onclick="arquivarVenda('+v.id+')" title="Remover do kanban">📦 Finalizar</button>'}
+else{
+h+='<button class="btn btn-sm btn-info" onclick="desarquivarVenda('+v.id+')" title="Reabrir no kanban">↺ Reabrir</button>'}
 h+='<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="confirmDelVenda('+v.id+')">Excluir</button>';
 h+='</div></div>'});h+='</div>'});h+='</div>';
 return h}
+
+window.arquivarVenda=async function(id){
+var v=getVenda(id);if(!v)return;
+if(!confirm('Finalizar e arquivar venda #'+id+'?\n\nA venda some do kanban mas continua nos relatórios e no banco. Você pode reabrir depois clicando em "Mostrar arquivadas".'))return;
+v.arquivado=true;
+var ok=await saveRecord('vendas',v.id,vendaToDB(v));
+if(ok){addHistDB('Venda #'+id+' arquivada');toast('Venda arquivada')}
+else{v.arquivado=false;toast('Falha ao arquivar','error')}
+render()};
+
+window.desarquivarVenda=async function(id){
+var v=getVenda(id);if(!v)return;
+v.arquivado=false;
+var ok=await saveRecord('vendas',v.id,vendaToDB(v));
+if(ok){addHistDB('Venda #'+id+' reaberta');toast('Venda reaberta')}
+else{v.arquivado=true;toast('Falha ao reabrir','error')}
+render()};
 
 // === BIBLIOTECA ===
 var GENEROS_LIVRO=["Candomblé","Culto Tradicional Yoruba (CTY)","Demonologia e satanismo","Desenvolvimento pessoal e sucesso","Espiritismo","Espiritualidade geral","Estratégia, poder e manipulação","Filosofia","Hipnose e hipnoterapia","Magia e feitiçaria","Mitologia","Negócios, dinheiro e marketing","Neurociência e mente","Ocultismo e esoterismo","PNL","Persuasão, influência e linguagem corporal","Psicologia","Religiões afro-diaspóricas sincréticas","Religiões comparadas","Saúde natural e terapias alternativas"];
@@ -1370,7 +1396,38 @@ st.all.forEach(function(x){if(x.aceito===true&&x.status==='arquivado'){nRecusado
 var nEbTot=nEbRit+nEbPresc;var vEbTot=vEbRit+vEbPrescAceito;
 var tG=tv+tcR+vEbRit;
 return '<div class="search-section"><div class="filters"><select onchange="S.reportPeriod=this.value;render()"><option value="semanal"'+(S.reportPeriod==='semanal'?' selected':'')+'>Semanal</option><option value="mensal"'+(S.reportPeriod==='mensal'?' selected':'')+'>Mensal</option><option value="trimestral"'+(S.reportPeriod==='trimestral'?' selected':'')+'>Trimestral</option><option value="semestral"'+(S.reportPeriod==='semestral'?' selected':'')+'>Semestral</option></select></div></div><div class="report-cards"><div class="report-card" style="border-left-color:var(--success)"><div class="rc-label">Vendas</div><div class="rc-value">'+vendas.length+'</div><div class="rc-sub">R$'+tv.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:var(--info)"><div class="rc-label">Consultas Normal</div><div class="rc-value">'+cNo.length+'</div></div><div class="report-card" style="border-left-color:var(--danger)"><div class="rc-label">Consultas Urgência</div><div class="rc-value">'+cUr.length+'</div></div><div class="report-card" style="border-left-color:#CA6F1E"><div class="rc-label">Rituais Avulsos</div><div class="rc-value">'+ritP.length+'</div><div class="rc-sub">R$'+vEbRit.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:var(--purple)"><div class="rc-label">Ebós Aceitos</div><div class="rc-value">'+nEbTot+'</div><div class="rc-sub">Avulsos: '+nEbRit+' + Prescritos: '+nEbPresc+' • R$'+vEbTot.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:#00695C"><div class="rc-label">Medicinas Aceitas</div><div class="rc-value">'+nMedPresc+'</div><div class="rc-sub">R$'+vMedPrescAceito.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:#C0392B"><div class="rc-label">Potencial Não Realizado</div><div class="rc-value" style="color:#C0392B">R$'+vPotencialNaoRealizado.toFixed(0)+'</div><div class="rc-sub">'+nRecusados+' itens recusados/arquivados</div></div><div class="report-card" style="border-left-color:var(--purple)"><div class="rc-label">Receita Consultas</div><div class="rc-value">R$'+tcR.toFixed(0)+'</div><div class="rc-sub">Cobrado: R$'+tcC.toFixed(2)+'</div></div><div class="report-card" style="border-left-color:var(--accent)"><div class="rc-label">Total Geral</div><div class="rc-value">R$'+tG.toFixed(0)+'</div><div class="rc-sub">Vendas + Consultas + Rituais</div></div></div><div class="chart-container"><div class="chart-title">Consultas no Período</div><div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Tipo</th><th>Qtd</th><th>Cobrado</th><th>Recebido</th></tr></thead><tbody><tr><td>Normal</td><td>'+cNo.length+'</td><td>R$'+cnC.toFixed(2)+'</td><td>R$'+cnR.toFixed(2)+'</td></tr><tr><td>Urgência</td><td>'+cUr.length+'</td><td>R$'+cuC.toFixed(2)+'</td><td>R$'+cuR.toFixed(2)+'</td></tr><tr style="font-weight:700;background:var(--accent-bg)"><td>TOTAL</td><td>'+consP.length+'</td><td>R$'+tcC.toFixed(2)+'</td><td>R$'+tcR.toFixed(2)+'</td></tr></tbody></table></div></div></div>'}
-function renderUsuarios(){var h='<div style="margin-bottom:12px"><button class="btn btn-primary" onclick="openAddUser()">+ Usuário</button><button class="btn btn-outline" onclick="loadUsuarios()" style="margin-left:8px">Atualizar Lista</button></div>';if(!S._authUsers||!S._authUsers.length){h+='<div class="empty-state">Carregando usuários...<br><button class="btn btn-sm btn-info" onclick="loadUsuarios()">Carregar</button></div>';return h}S._authUsers.forEach(function(u){h+='<div class="user-card"><div class="user-info"><div class="user-avatar avatar-'+u.perfil+'">'+((u?.username || 'Usuario')[0]).toUpperCase()+'</div><div><div style="font-weight:500">'+esc(u.username || 'Usuario')+'</div><div style="font-size:12px;color:var(--text2)">'+u.perfil+'</div><div style="font-size:11px;color:var(--text3)">'+esc(u.email||'')+'</div></div></div><div style="display:flex;gap:6px"><button class="btn btn-sm btn-outline" onclick="openChgPwd(\''+esc(u.username)+'\')">Nova Senha</button></div></div>'});return h}
+function renderUsuarios(){
+var perfis=['admin','babalawo','secretario','assistente','editor','visualizador'];
+var h='<div style="background:#FEF5E7;border-left:4px solid #F39C12;padding:12px 16px;border-radius:var(--radius);margin-bottom:16px;font-size:13px;line-height:1.5">';
+h+='<strong>⚠ Gerenciamento simplificado</strong><br>';
+h+='Esta tela define apenas o <strong>perfil de aplicação</strong> (admin, editor, visualizador, etc) de cada usuário.<br>';
+h+='Para <strong>criar logins, redefinir senhas, suspender contas ou remover usuários</strong>, use o painel do Supabase: <em>Authentication → Users</em>.';
+h+='</div>';
+h+='<div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-primary" onclick="openAddUser()">+ Vincular Perfil</button><button class="btn btn-outline" onclick="loadUsuarios()">Atualizar Lista</button></div>';
+if(!S._authUsers||!S._authUsers.length){h+='<div class="empty-state">Nenhum perfil cadastrado.<br><button class="btn btn-sm btn-info" onclick="loadUsuarios()">Carregar</button></div>';return h}
+h+='<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Username</th><th>Perfil</th><th>Email</th><th>Ações</th></tr></thead><tbody>';
+S._authUsers.forEach(function(u){
+var opts=perfis.map(function(p){return '<option value="'+p+'"'+(u.perfil===p?' selected':'')+'>'+p+'</option>'}).join('');
+h+='<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="user-avatar avatar-'+u.perfil+'" style="width:32px;height:32px;font-size:13px">'+((u.username||'?')[0]).toUpperCase()+'</div><strong>'+esc(u.username||'')+'</strong></div></td>';
+h+='<td><select onchange="alterarPerfil(\''+esc(u.username)+'\',this.value)" style="padding:4px 8px;font-size:13px">'+opts+'</select></td>';
+h+='<td style="font-size:12px;color:var(--text2)">'+esc(u.email||'')+'</td>';
+h+='<td><button class="btn btn-sm btn-outline" onclick="openChgPwd(\''+esc(u.username)+'\')">Nova Senha</button></td></tr>'});
+h+='</tbody></table></div></div>';
+return h}
+
+window.alterarPerfil=async function(username,novoPerfil){
+if(!confirm('Alterar perfil de '+username+' para "'+novoPerfil+'"?\n\nO usuário precisará fazer login novamente para a mudança ter efeito.'))return;
+var u=(S._authUsers||[]).find(function(x){return x.username===username});
+if(!u)return toast('Usuário não encontrado','error');
+try{
+var h=await getAuthHeaders('return=representation');
+var r=await fetch(SUPABASE_URL+'/rest/v1/usuarios?username=eq.'+encodeURIComponent(username),{method:'PATCH',headers:h,body:JSON.stringify({perfil:novoPerfil})});
+if(!r.ok)throw new Error('PATCH '+r.status);
+u.perfil=novoPerfil;
+addHistDB('Perfil alterado: '+username+' → '+novoPerfil);
+toast('Perfil atualizado!');
+render()}
+catch(e){toast('Falha ao atualizar perfil: '+e.message,'error');console.error(e)}};
 function renderHistorico(){
 if(!S.history.length)return '<div class="empty-state">Nenhum registro</div>';
 var users={};S.history.forEach(function(h){users[h.user]=1});var uList=Object.keys(users).sort();
