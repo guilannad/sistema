@@ -409,6 +409,7 @@ function _shortUserAgent(){
 }
 
 // Verifica autorização. Retorna: 'aprovado', 'pendente', 'revogado', 'novo'
+// ==================== AUTORIZAÇÃO DE DISPOSITIVO (já existente) ====================
 async function checkDispositivoAutorizado(username){
   var token=_getOrCreateDeviceToken();
   try{
@@ -436,6 +437,146 @@ async function checkDispositivoAutorizado(username){
     return 'erro';
   }
 }
+
+// ==================== HORÁRIO DE ACESSO ====================
+// Editor/visualizador só acessam seg-sex 10h-19h05 (fuso São Paulo)
+// Admin pode liberar acesso emergencial via solicitacoes_acesso
+
+function _agoraSP(){
+  // Retorna {ano, mes, dia, hora, min, diaSemana} no fuso América/São_Paulo
+  // diaSemana: 0=domingo, 1=seg, ..., 6=sáb
+  var d=new Date();
+  var fmt=new Intl.DateTimeFormat('pt-BR',{
+    timeZone:'America/Sao_Paulo',
+    year:'numeric',month:'2-digit',day:'2-digit',
+    hour:'2-digit',minute:'2-digit',second:'2-digit',
+    hour12:false,weekday:'short'
+  });
+  var parts={};
+  fmt.formatToParts(d).forEach(function(p){if(p.type!=='literal')parts[p.type]=p.value});
+  // Calcula dia da semana com fuso correto
+  var dataSP=new Date(d.toLocaleString('en-US',{timeZone:'America/Sao_Paulo'}));
+  return {
+    ano:parseInt(parts.year),mes:parseInt(parts.month),dia:parseInt(parts.day),
+    hora:parseInt(parts.hour),min:parseInt(parts.minute),
+    diaSemana:dataSP.getDay()
+  }
+}
+
+function dentroHorarioPermitido(perfil){
+  // Admin/babalawo/secretário/assistente sempre podem
+  if(perfil==='admin'||perfil==='babalawo'||perfil==='secretario'||perfil==='assistente')return true;
+  if(perfil!=='editor'&&perfil!=='viewer'&&perfil!=='visualizador')return true;
+  var t=_agoraSP();
+  // Bloqueia sábado (6) e domingo (0)
+  if(t.diaSemana===0||t.diaSemana===6)return false;
+  // Janela: 10:00 ≤ hora < 19:05
+  var minutosAgora=t.hora*60+t.min;
+  var inicio=10*60;     // 10:00
+  var fim=19*60+5;       // 19:05
+  return minutosAgora>=inicio && minutosAgora<fim;
+}
+
+// Verifica se há liberação emergencial ativa para o usuário
+async function temLiberacaoEmergencial(username){
+  try{
+    var agora=new Date().toISOString();
+    var r=await sbGet('solicitacoes_acesso','?username=eq.'+encodeURIComponent(username)+'&status=eq.aprovado&valido_ate=gt.'+encodeURIComponent(agora)+'&order=valido_ate.desc&limit=1');
+    if(!r.ok)return false;
+    var rows=await r.json();
+    return rows.length>0;
+  }catch(e){return false}
+}
+
+// Solicita acesso emergencial
+async function solicitarAcessoEmergencial(username,motivo){
+  try{
+    var r=await sbPost('solicitacoes_acesso',{
+      username:username,
+      motivo:motivo||'',
+      status:'pendente'
+    });
+    return r.ok;
+  }catch(e){return false}
+}
+
+// ==================== MONITOR DE HORÁRIO ====================
+// Roda em loop verificando se o usuário ainda está em horário permitido
+var _horarioCheckInterval = null;
+var _avisoMostrado18h = false;
+
+function _iniciarMonitorHorario(){
+  if (_horarioCheckInterval) clearInterval(_horarioCheckInterval);
+  _avisoMostrado18h = false;
+  _checarHorarioContinuo();
+  _horarioCheckInterval = setInterval(_checarHorarioContinuo, 30000); // 30 segundos
+}
+
+function _pararMonitorHorario(){
+  if (_horarioCheckInterval) { clearInterval(_horarioCheckInterval); _horarioCheckInterval = null }
+  _avisoMostrado18h = false;
+}
+
+async function _checarHorarioContinuo(){
+  if (!S.currentUser) return;
+  var perfil = S.currentUser.perfil;
+  if (perfil !== 'editor' && perfil !== 'viewer' && perfil !== 'visualizador') return;
+  // Se passou do horário, verifica se tem liberação emergencial; senão, força logout
+  if (!dentroHorarioPermitido(perfil)){
+    var liberado = await temLiberacaoEmergencial(S.currentUser.username);
+    if (!liberado){
+      var username = S.currentUser.username;
+      addHistDB('Logout automático por horário: '+username);
+      try{ await authSignOut() }catch(e){}
+      S.currentUser = null;
+      S._horarioBloqueio = {username: username};
+      _pararMonitorHorario();
+      if (typeof render === 'function') render();
+      return;
+    }
+  }
+  // Aviso prévio às 18:55 (apenas em dias úteis)
+  var t = _agoraSP();
+  var minutosAgora = t.hora * 60 + t.min;
+  var minutoAviso = 18 * 60 + 55;
+  var minutoFim = 19 * 60 + 5;
+  if (t.diaSemana >= 1 && t.diaSemana <= 5 && minutosAgora >= minutoAviso && minutosAgora < minutoFim && !_avisoMostrado18h){
+    _avisoMostrado18h = true;
+    if (typeof toast === 'function') toast('⚠ Sua sessão será encerrada às 19:05. Salve suas alterações.','info');
+    setTimeout(function(){
+      try{ alert('Atenção: sua sessão será encerrada automaticamente às 19:05 (em poucos minutos).\n\nSalve suas alterações agora.') }catch(e){}
+    }, 500);
+  }
+}
+
+// ==================== TELA DE BLOQUEIO POR HORÁRIO ====================
+function renderHorarioBloqueado(){
+  var b = S._horarioBloqueio || {};
+  var t = _agoraSP();
+  var diaNome = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'][t.diaSemana] || '';
+  var horaAtual = String(t.hora).padStart(2,'0')+':'+String(t.min).padStart(2,'0');
+  var msgFimSemana = (t.diaSemana === 0 || t.diaSemana === 6) ? '<p style="margin-top:8px"><strong>'+diaNome+'</strong> — acesso restrito a dias úteis.</p>' : '';
+  return '<div class="login-wrap"><div class="login-card" style="max-width:480px">'+
+    '<div style="font-size:60px;margin-bottom:8px">🕐</div>'+
+    '<h1 style="font-family:Playfair Display,serif;font-size:22px;color:#C0392B;margin-bottom:16px">Acesso fora do horário permitido</h1>'+
+    '<div style="text-align:left;background:var(--bg2);padding:16px;border-radius:8px;font-size:14px;line-height:1.5">'+
+    '<p>Olá <strong>'+esc(b.username||'')+'</strong>, o acesso para o seu perfil é permitido apenas:</p>'+
+    '<p style="margin-top:12px;padding:10px;background:#fff;border-left:3px solid var(--accent);font-weight:600">📅 Segunda a sexta-feira<br>🕙 das 10:00 às 19:05 (horário de Brasília)</p>'+
+    '<p style="margin-top:12px;font-size:13px;color:var(--text2)">'+diaNome+', '+horaAtual+'</p>'+
+    msgFimSemana+
+    '<p style="margin-top:12px;font-size:13px;color:var(--text2)">Se precisa de acesso emergencial, entre em contato com o administrador.</p>'+
+    '</div>'+
+    '<div style="margin-top:20px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'+
+    '<button class="btn btn-outline" onclick="window.location.reload()">Tentar novamente</button>'+
+    '<button class="btn btn-outline" onclick="cancelarHorarioBloqueio()">Voltar ao login</button>'+
+    '</div></div></div>';
+}
+
+window.cancelarHorarioBloqueio = async function(){
+  S._horarioBloqueio = null;
+  try{ await authSignOut() }catch(e){}
+  render();
+};
 
 // ==================== COUNTRY CODES (for phone international) ====================
 var COUNTRY_CODES=[
@@ -1200,6 +1341,11 @@ w.document.write(h);w.document.close()}
 function render(){
 var app=document.getElementById('app');
 if(!S.currentUser){
+  // Se há usuário bloqueado por horário, mostra tela específica
+  if(S._horarioBloqueio){
+    app.innerHTML=renderHorarioBloqueado();
+    return
+  }
   // Se há usuário bloqueado por dispositivo, mostra tela de bloqueio
   if(S._blockedUser){
     app.innerHTML=renderDispositivoBloqueado();
@@ -1280,20 +1426,31 @@ function bindLogin(){var eb=document.getElementById('eyeBtn'),lp=document.getEle
 async function doLogin(){var u=document.getElementById('loginUser').value.trim(),p=document.getElementById('loginPass').value;
 var user=await dbLogin(u,p);
 if(user){
-  // Verifica dispositivo se for editor/visualizador
+  // Verifica horário se for editor/visualizador
   var perfil=user.perfil;
   if(perfil==='editor'||perfil==='viewer'||perfil==='visualizador'){
+    if(!dentroHorarioPermitido(perfil)){
+      // Verifica se tem liberação emergencial
+      var liberado=await temLiberacaoEmergencial(user.username);
+      if(!liberado){
+        S._horarioBloqueio={username:user.username};
+        addHistDB('Login bloqueado por horário: '+user.username);
+        try{await authSignOut()}catch(e){}
+        render();
+        return;
+      }
+    }
+    // Verifica dispositivo
     var st=await checkDispositivoAutorizado(user.username);
     S._deviceStatus=st;
     if(st!=='aprovado'){
-      // Bloqueia acesso. Guarda user só para mostrar mensagem com nome
       S._blockedUser=user;
       addHistDB('Login bloqueado por dispositivo ('+st+'): '+user.username);
       render();
       return;
     }
   }
-  S.currentUser=user;_lockConsoleIfRestricted();S.activeTab=(user.perfil==='editor')?'gerenciar':((user.perfil==='viewer'||user.perfil==='visualizador')?'gerenciar':'dashboard');addHistDB('Login');render();checkAlerts()
+  S.currentUser=user;_lockConsoleIfRestricted();S.activeTab=(user.perfil==='editor')?'gerenciar':((user.perfil==='viewer'||user.perfil==='visualizador')?'gerenciar':'dashboard');addHistDB('Login');render();checkAlerts();_iniciarMonitorHorario();
 }
 else{document.getElementById('loginError').style.display='block'}}
 
@@ -2142,7 +2299,7 @@ if(['gerenciar','biblioteca'].indexOf(t)<0){toast('Acesso restrito','error');ret
 else if(S.currentUser&&(S.currentUser.perfil==='viewer'||S.currentUser.perfil==='visualizador')){
 if(['busca','gerenciar','biblioteca'].indexOf(t)<0){toast('Acesso restrito','error');return}}
 S.activeTab=t;S.search='';S.filterSecao='';S.filterTipo='';S.filterStatus='';S.filterGenero='';S.filterTipoLivro='';S.filterSecaoLivro='';S.filterEstoque='';S.page=1;render()};
-window.doLogout=async function(){addHistDB('Logout');await authSignOut();S.currentUser=null;render()};
+window.doLogout=async function(){addHistDB('Logout');_pararMonitorHorario();await authSignOut();S.currentUser=null;render()};
 window.doSearch=function(){var si=document.getElementById('searchInput');if(si)S.search=si.value;S.page=1;render()};
 window.setFilterEstoque=function(f){S.filterEstoque=f;S.page=1;render()};
 window.closeModal=function(){S.modal=null;S.editItem=null;S.editUser=null;S.editConsulente=null;S.confirmText='';S.confirmAction=null;S.flowType=null;S.flowPessoaId=null;render()};
@@ -2828,14 +2985,24 @@ if (_sb) {
           authUser: user
         };
 
-        // Verifica dispositivo se for editor/visualizador
+        // Verifica horário e dispositivo se for editor/visualizador
         var rPerfil = restoredUser.perfil;
         if (rPerfil === 'editor' || rPerfil === 'viewer' || rPerfil === 'visualizador'){
+          // Horário primeiro
+          if(!dentroHorarioPermitido(rPerfil)){
+            var lib=await temLiberacaoEmergencial(restoredUser.username);
+            if(!lib){
+              S._horarioBloqueio={username:restoredUser.username};
+              try{await authSignOut()}catch(e){}
+              console.log('[AUTH] Sessão restaurada, mas fora do horário permitido');
+              return;
+            }
+          }
+          // Depois dispositivo
           var rSt = await checkDispositivoAutorizado(restoredUser.username);
           S._deviceStatus = rSt;
           if (rSt !== 'aprovado'){
             S._blockedUser = restoredUser;
-            // Não popula S.currentUser — fica na tela de bloqueio
             console.log('[AUTH] Sessão restaurada, mas dispositivo não autorizado:', rSt);
             return;
           }
@@ -2843,6 +3010,7 @@ if (_sb) {
         S.currentUser = restoredUser;
 
         _lockConsoleIfRestricted();
+        _iniciarMonitorHorario();
         console.log('[AUTH] Session restored: ' + S.currentUser.username);
       }
     }
