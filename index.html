@@ -585,16 +585,22 @@ try{
     }
 
     render();
+    return true;
   }
   else{
     _lastSyncStatus = 'error';
+    var errBody='';
+    try{errBody=await resp.text()}catch(e){}
+    console.error('[SAVE FAIL]',table,'id='+id,'status='+resp.status,errBody);
     toast('Erro ao salvar: '+resp.status,'error');
+    return false;
   }
 
 }catch(e){
   _lastSyncStatus = 'offline';
   toast('Erro de conexão','error');
-  console.log('[SAVE ERROR]', e);
+  console.error('[SAVE ERROR]', table, e);
+  return false;
 }
 }
 
@@ -1331,8 +1337,8 @@ var ok=await saveRecord('vendas',v.id,vendaToDB(v));
 if(ok){addHistDB('Venda #'+id+' arquivada');toast('Venda arquivada')}
 else{
   v.arquivado=false;
-  toast('Falha ao arquivar — verifique se a coluna "arquivado" foi criada no Supabase (rode vendas_arquivado.sql)','error');
-  console.error('[ARQUIVAR] Falha. Provável causa: coluna "arquivado" não existe na tabela vendas. Execute vendas_arquivado.sql no Supabase.')
+  toast('Falha ao arquivar — veja detalhes no console (F12)','error');
+  console.error('[ARQUIVAR] Falha ao salvar venda #'+id+'. Verifique mensagens [SAVE FAIL] acima para detalhes do erro retornado pelo Supabase.')
 }
 render()};
 
