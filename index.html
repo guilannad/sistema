@@ -369,6 +369,74 @@ function _lockConsoleIfRestricted(){
   }
 }
 
+// ==================== AUTORIZAÇÃO DE DISPOSITIVO ====================
+// Editor/visualizador precisam de dispositivo aprovado pelo admin para acessar
+var DEVICE_TOKEN_KEY='ile_device_token';
+var DEVICE_NAME_KEY='ile_device_name';
+
+function _generateUUID(){
+  if(typeof crypto!=='undefined'&&crypto.randomUUID){try{return crypto.randomUUID()}catch(e){}}
+  return 'dev-'+Date.now().toString(36)+'-'+Math.random().toString(36).substring(2,15);
+}
+function _getOrCreateDeviceToken(){
+  try{
+    var t=localStorage.getItem(DEVICE_TOKEN_KEY);
+    if(!t){t=_generateUUID();localStorage.setItem(DEVICE_TOKEN_KEY,t)}
+    return t;
+  }catch(e){return 'no-storage-'+Date.now()}
+}
+function _getDeviceName(){
+  try{return localStorage.getItem(DEVICE_NAME_KEY)||''}catch(e){return ''}
+}
+function _setDeviceName(n){
+  try{localStorage.setItem(DEVICE_NAME_KEY,n||'')}catch(e){}
+}
+function _shortUserAgent(){
+  var ua=navigator.userAgent||'';
+  // Detecta browser e SO de forma compacta
+  var b='?';
+  if(ua.indexOf('Edg/')>=0)b='Edge';
+  else if(ua.indexOf('Chrome')>=0)b='Chrome';
+  else if(ua.indexOf('Firefox')>=0)b='Firefox';
+  else if(ua.indexOf('Safari')>=0)b='Safari';
+  var os='?';
+  if(ua.indexOf('Windows')>=0)os='Windows';
+  else if(ua.indexOf('Mac')>=0)os='Mac';
+  else if(ua.indexOf('Linux')>=0)os='Linux';
+  else if(ua.indexOf('Android')>=0)os='Android';
+  else if(ua.indexOf('iPhone')>=0||ua.indexOf('iPad')>=0)os='iOS';
+  return b+' / '+os;
+}
+
+// Verifica autorização. Retorna: 'aprovado', 'pendente', 'revogado', 'novo'
+async function checkDispositivoAutorizado(username){
+  var token=_getOrCreateDeviceToken();
+  try{
+    var r=await sbGet('dispositivos_autorizados','?token=eq.'+encodeURIComponent(token)+'&username=eq.'+encodeURIComponent(username));
+    if(!r.ok)return 'erro';
+    var rows=await r.json();
+    if(!rows.length){
+      // Dispositivo desconhecido: registra como pendente
+      var nomeAuto=_getDeviceName()||(_shortUserAgent()+' • '+new Date().toLocaleDateString('pt-BR'));
+      var ins=await sbPost('dispositivos_autorizados',{
+        username:username,
+        token:token,
+        nome_dispositivo:nomeAuto,
+        user_agent:_shortUserAgent(),
+        status:'pendente'
+      });
+      return 'novo';
+    }
+    var d=rows[0];
+    // Atualiza ultimo_acesso (não bloqueia)
+    sbPatch('dispositivos_autorizados','?id=eq.'+d.id,{ultimo_acesso:new Date().toISOString()}).catch(function(){});
+    return d.status;
+  }catch(e){
+    console.error('[DISPOSITIVO]',e);
+    return 'erro';
+  }
+}
+
 // ==================== COUNTRY CODES (for phone international) ====================
 var COUNTRY_CODES=[
 {code:'+55',name:'Brasil',flag:'🇧🇷'},
@@ -801,6 +869,19 @@ try{
     S.pedidosExclusao = [];
   }
 
+  // ================= DISPOSITIVOS AUTORIZADOS (só admin) =================
+  if(perfil === 'admin'){
+    try{
+      const rd = await sbGet('dispositivos_autorizados','?order=criado_em.desc&limit=500');
+      if(rd.ok){
+        S.dispositivos = await rd.json();
+        if(!quiet) console.log('[LOAD] dispositivos', S.dispositivos.length);
+      }
+    }catch(e){if(!quiet) console.warn('dispositivos não carregou:',e.message)}
+  } else {
+    S.dispositivos = [];
+  }
+
   _dbReady = true;
   _lastSyncStatus = 'ok';
 
@@ -1118,7 +1199,14 @@ w.document.write(h);w.document.close()}
 // ==================== RENDER ====================
 function render(){
 var app=document.getElementById('app');
-if(!S.currentUser){app.innerHTML=renderLogin();bindLogin();return}
+if(!S.currentUser){
+  // Se há usuário bloqueado por dispositivo, mostra tela de bloqueio
+  if(S._blockedUser){
+    app.innerHTML=renderDispositivoBloqueado();
+    return
+  }
+  app.innerHTML=renderLogin();bindLogin();return
+}
 var h=renderHeader();
 if(!hasRole(['viewer','visualizador','editor']))h+=renderQuickBar();
 h+=renderTabs();
@@ -1147,6 +1235,36 @@ app.innerHTML=h;bindAll()}
 
 function renderLogin(){return '<div class="login-wrap"><div class="login-card"><span style="font-size:42px;display:block;margin-bottom:12px">\u{1F3DB}\uFE0F</span><h1 style="font-family:Playfair Display,serif;font-size:26px;color:var(--accent)">Ilé Ifagbemi Brasil</h1><p style="color:var(--text2);font-size:14px;margin-bottom:28px">Sistema de Gestão</p><div class="login-error" id="loginError">Usuário ou senha incorretos</div><div class="form-group"><label>Usuário</label><div class="input-wrap"><input type="text" id="loginUser" placeholder="Seu usuário"></div></div><div class="form-group"><label>Senha</label><div class="input-wrap"><input type="password" id="loginPass" placeholder="Sua senha"><button class="eye-btn" id="eyeBtn">\u{1F441}\uFE0F</button></div></div><button class="btn btn-primary login-btn" id="loginBtn" style="width:100%;padding:12px;font-size:15px;font-weight:600;margin-top:8px">Entrar</button><div style="text-align:center;margin-top:16px"><a href="#" onclick="esqueciSenha();return false" style="color:var(--accent);font-size:13px;text-decoration:none">Esqueci minha senha</a></div></div></div>'}
 
+function renderDispositivoBloqueado(){
+var u=S._blockedUser||{};
+var st=S._deviceStatus||'pendente';
+var titulo,corpo,icone,cor;
+if(st==='pendente'||st==='novo'){
+  icone='⏳';cor='#F39C12';titulo='Aguardando aprovação do administrador';
+  corpo='<p>Olá <strong>'+esc(u.username||'')+'</strong>, este dispositivo é novo e precisa ser autorizado pelo administrador antes de você acessar o sistema.</p>'+
+  '<p style="margin-top:12px;font-size:13px;color:var(--text2)">Por favor, peça ao administrador para aprovar este computador na aba <em>Usuários → Dispositivos</em>.</p>'+
+  '<p style="margin-top:8px;font-size:12px;color:var(--text3)">Depois de aprovado, recarregue esta página.</p>';
+}else if(st==='revogado'){
+  icone='🚫';cor='#C0392B';titulo='Dispositivo revogado';
+  corpo='<p>O acesso deste dispositivo foi <strong>revogado</strong> pelo administrador.</p>'+
+  '<p style="margin-top:12px;font-size:13px;color:var(--text2)">Entre em contato com o administrador caso isso seja um engano.</p>';
+}else{
+  icone='⚠';cor='#7F8C8D';titulo='Não foi possível verificar o dispositivo';
+  corpo='<p>Houve uma falha ao validar este dispositivo. Tente novamente em alguns instantes.</p>';
+}
+return '<div class="login-wrap"><div class="login-card" style="max-width:480px"><div style="font-size:60px;margin-bottom:8px">'+icone+'</div>'+
+'<h1 style="font-family:Playfair Display,serif;font-size:22px;color:'+cor+';margin-bottom:16px">'+titulo+'</h1>'+
+'<div style="text-align:left;background:var(--bg2);padding:16px;border-radius:8px;font-size:14px;line-height:1.5">'+corpo+'</div>'+
+'<div style="margin-top:20px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'+
+'<button class="btn btn-outline" onclick="window.location.reload()">Tentar novamente</button>'+
+'<button class="btn btn-outline" onclick="cancelarBloqueio()">Voltar ao login</button>'+
+'</div></div></div>'}
+
+window.cancelarBloqueio=async function(){
+S._blockedUser=null;S._deviceStatus=null;
+try{await authSignOut()}catch(e){}
+render()};
+
 window.esqueciSenha=async function(){
 var email=prompt('Digite seu email cadastrado para receber o link de redefinição de senha:','');
 if(!email)return;
@@ -1161,7 +1279,22 @@ try{
 function bindLogin(){var eb=document.getElementById('eyeBtn'),lp=document.getElementById('loginPass');if(eb)eb.onclick=function(){lp.type=lp.type==='password'?'text':'password'};document.getElementById('loginBtn').onclick=doLogin;document.getElementById('loginUser').onkeydown=function(e){if(e.key==='Enter')doLogin()};lp.onkeydown=function(e){if(e.key==='Enter')doLogin()}}
 async function doLogin(){var u=document.getElementById('loginUser').value.trim(),p=document.getElementById('loginPass').value;
 var user=await dbLogin(u,p);
-if(user){S.currentUser=user;_lockConsoleIfRestricted();S.activeTab=(user.perfil==='editor')?'gerenciar':((user.perfil==='viewer'||user.perfil==='visualizador')?'gerenciar':'dashboard');addHistDB('Login');render();checkAlerts()}
+if(user){
+  // Verifica dispositivo se for editor/visualizador
+  var perfil=user.perfil;
+  if(perfil==='editor'||perfil==='viewer'||perfil==='visualizador'){
+    var st=await checkDispositivoAutorizado(user.username);
+    S._deviceStatus=st;
+    if(st!=='aprovado'){
+      // Bloqueia acesso. Guarda user só para mostrar mensagem com nome
+      S._blockedUser=user;
+      addHistDB('Login bloqueado por dispositivo ('+st+'): '+user.username);
+      render();
+      return;
+    }
+  }
+  S.currentUser=user;_lockConsoleIfRestricted();S.activeTab=(user.perfil==='editor')?'gerenciar':((user.perfil==='viewer'||user.perfil==='visualizador')?'gerenciar':'dashboard');addHistDB('Login');render();checkAlerts()
+}
 else{document.getElementById('loginError').style.display='block'}}
 
 function renderHeader(){
@@ -1210,6 +1343,11 @@ function renderHeader(){
 
       ((hasRole(['admin']) && getPedidosPendentes().length>0)
         ? '<button class="btn btn-sm" style="background:#F39C12;color:#fff;display:inline-flex;align-items:center;gap:4px" onclick="setTab(\'dashboard\')" title="Pedidos de exclusão pendentes">⏳ '+getPedidosPendentes().length+'</button>'
+        : ''
+      ) +
+
+      ((hasRole(['admin']) && (S.dispositivos||[]).filter(function(d){return d.status==='pendente'}).length>0)
+        ? '<button class="btn btn-sm" style="background:#3498DB;color:#fff;display:inline-flex;align-items:center;gap:4px" onclick="setTab(\'usuarios\')" title="Dispositivos aguardando aprovação">📱 '+(S.dispositivos||[]).filter(function(d){return d.status==='pendente'}).length+'</button>'
         : ''
       ) +
 
@@ -1549,7 +1687,67 @@ h+='<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="use
 h+='<td><select onchange="alterarPerfil(\''+esc(u.username)+'\',this.value)" style="padding:4px 8px;font-size:13px">'+opts+'</select></td>';
 h+='<td style="font-size:12px;color:var(--text2)">'+esc(u.email||'')+'</td></tr>'});
 h+='</tbody></table></div></div>';
+
+// Seção: Dispositivos autorizados
+var disp=S.dispositivos||[];
+var pendentes=disp.filter(function(d){return d.status==='pendente'});
+var aprovados=disp.filter(function(d){return d.status==='aprovado'});
+var revogados=disp.filter(function(d){return d.status==='revogado'});
+
+h+='<div style="margin-top:32px"><h2 style="font-family:Playfair Display,serif;color:var(--accent);margin-bottom:8px;display:flex;align-items:center;gap:8px">📱 Dispositivos Autorizados '+(pendentes.length>0?'<span style="background:#F39C12;color:#fff;padding:2px 10px;border-radius:12px;font-size:13px;font-weight:700">'+pendentes.length+' pendente(s)</span>':'')+'</h2>';
+h+='<div style="background:#FEF5E7;border-left:4px solid #F39C12;padding:10px 14px;border-radius:var(--radius);margin-bottom:14px;font-size:12px;line-height:1.5">Editor e visualizador só conseguem acessar de dispositivos <strong>aprovados</strong>. O dispositivo é identificado pelo navegador. Se o usuário limpar dados ou usar outro navegador/PC, precisa nova aprovação.</div>';
+
+if(pendentes.length){
+  h+='<h3 style="font-size:14px;color:#B9770E;margin:14px 0 6px">⏳ Aguardando aprovação ('+pendentes.length+')</h3>';
+  h+='<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Usuário</th><th>Dispositivo</th><th>Solicitado em</th><th>Ações</th></tr></thead><tbody>';
+  pendentes.forEach(function(d){
+    h+='<tr><td><strong>'+esc(d.username)+'</strong></td><td style="font-size:12px">'+esc(d.nome_dispositivo||d.user_agent||'?')+'</td><td style="font-size:12px;color:var(--text2)">'+fmtDateTime(d.criado_em)+'</td><td><div class="actions-cell"><button class="btn btn-sm btn-success" onclick="aprovarDispositivo('+d.id+')">✓ Aprovar</button><button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="revogarDispositivo('+d.id+')">✗ Recusar</button></div></td></tr>';
+  });
+  h+='</tbody></table></div></div>';
+}
+
+if(aprovados.length){
+  h+='<h3 style="font-size:14px;color:#1E8449;margin:14px 0 6px">✓ Aprovados ('+aprovados.length+')</h3>';
+  h+='<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Usuário</th><th>Dispositivo</th><th>Aprovado em</th><th>Por</th><th>Último acesso</th><th>Ações</th></tr></thead><tbody>';
+  aprovados.forEach(function(d){
+    h+='<tr><td><strong>'+esc(d.username)+'</strong></td><td style="font-size:12px">'+esc(d.nome_dispositivo||d.user_agent||'?')+'</td><td style="font-size:12px;color:var(--text2)">'+fmtDateTime(d.aprovado_em)+'</td><td style="font-size:12px;color:var(--text2)">'+esc(d.aprovado_por||'')+'</td><td style="font-size:12px;color:var(--text2)">'+(d.ultimo_acesso?fmtDateTime(d.ultimo_acesso):'—')+'</td><td><button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="revogarDispositivo('+d.id+')">Revogar</button></td></tr>';
+  });
+  h+='</tbody></table></div></div>';
+}
+
+if(revogados.length){
+  h+='<details style="margin-top:14px"><summary style="cursor:pointer;font-size:14px;color:var(--text2)">Revogados ('+revogados.length+')</summary>';
+  h+='<div class="table-wrap" style="margin-top:8px"><div class="table-scroll"><table><thead><tr><th>Usuário</th><th>Dispositivo</th><th>Revogado em</th><th>Por</th><th>Ações</th></tr></thead><tbody>';
+  revogados.forEach(function(d){
+    h+='<tr style="opacity:.7"><td>'+esc(d.username)+'</td><td style="font-size:12px">'+esc(d.nome_dispositivo||d.user_agent||'?')+'</td><td style="font-size:12px;color:var(--text2)">'+fmtDateTime(d.aprovado_em)+'</td><td style="font-size:12px;color:var(--text2)">'+esc(d.aprovado_por||'')+'</td><td><button class="btn btn-sm btn-success" onclick="aprovarDispositivo('+d.id+')">Reativar</button></td></tr>';
+  });
+  h+='</tbody></table></div></div></details>';
+}
+
+if(!disp.length){
+  h+='<div class="empty-state" style="padding:20px">Nenhum dispositivo registrado ainda. Quando um editor ou visualizador tentar acessar pela primeira vez, o dispositivo aparecerá aqui para aprovação.</div>';
+}
+
+h+='</div>';
 return h}
+
+window.aprovarDispositivo=async function(id){
+var d=(S.dispositivos||[]).find(function(x){return x.id===id});if(!d)return;
+if(!confirm('Aprovar dispositivo de '+d.username+'?\n\nUsuário poderá acessar a partir deste dispositivo até que você revogue.'))return;
+var payload={status:'aprovado',aprovado_por:_user(),aprovado_em:new Date().toISOString()};
+var ok=await saveRecord('dispositivos_autorizados',d.id,payload);
+if(ok){Object.assign(d,payload);addHistDB('Dispositivo aprovado: '+d.username+' ('+(d.nome_dispositivo||d.user_agent)+')');toast('Dispositivo aprovado!')}
+else toast('Falha ao aprovar','error');
+render()};
+
+window.revogarDispositivo=async function(id){
+var d=(S.dispositivos||[]).find(function(x){return x.id===id});if(!d)return;
+if(!confirm('Revogar acesso do dispositivo de '+d.username+'?\n\nUsuário será deslogado deste dispositivo na próxima requisição.'))return;
+var payload={status:'revogado'};
+var ok=await saveRecord('dispositivos_autorizados',d.id,payload);
+if(ok){d.status='revogado';addHistDB('Dispositivo revogado: '+d.username+' ('+(d.nome_dispositivo||d.user_agent)+')');toast('Dispositivo revogado','info')}
+else toast('Falha ao revogar','error');
+render()};
 
 window.alterarPerfil=async function(username,novoPerfil){
 if(!confirm('Alterar perfil de '+username+' para "'+novoPerfil+'"?\n\nO usuário precisará fazer login novamente para a mudança ter efeito.'))return;
@@ -2620,7 +2818,7 @@ if (_sb) {
       var user = await authGetUser();
 
       if (user && user.user_metadata) {
-        S.currentUser = {
+        var restoredUser = {
           username: (
             user?.user_metadata?.username ||
             user?.email?.split('@')[0] ||
@@ -2629,6 +2827,20 @@ if (_sb) {
           perfil: user?.user_metadata?.perfil || 'viewer',
           authUser: user
         };
+
+        // Verifica dispositivo se for editor/visualizador
+        var rPerfil = restoredUser.perfil;
+        if (rPerfil === 'editor' || rPerfil === 'viewer' || rPerfil === 'visualizador'){
+          var rSt = await checkDispositivoAutorizado(restoredUser.username);
+          S._deviceStatus = rSt;
+          if (rSt !== 'aprovado'){
+            S._blockedUser = restoredUser;
+            // Não popula S.currentUser — fica na tela de bloqueio
+            console.log('[AUTH] Sessão restaurada, mas dispositivo não autorizado:', rSt);
+            return;
+          }
+        }
+        S.currentUser = restoredUser;
 
         _lockConsoleIfRestricted();
         console.log('[AUTH] Session restored: ' + S.currentUser.username);
