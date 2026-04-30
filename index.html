@@ -332,6 +332,32 @@ prescEbos:[{titulo:'',descricao:'',valor:0}],
 prescMeds:[{titulo:'',descricao:'',valor:0}]
 };
 
+// ==================== CONSOLE LOCK (privacidade para perfis restritos) ====================
+// Salva referências originais antes que possam ser silenciadas
+var _origConsoleLog = console.log.bind(console);
+var _origConsoleWarn = console.warn.bind(console);
+var _origConsoleError = console.error.bind(console);
+var _origConsoleInfo = console.info.bind(console);
+var _consoleLocked = false;
+
+function _lockConsoleIfRestricted(){
+  var p = S.currentUser && S.currentUser.perfil;
+  var restricted = (p === 'editor' || p === 'viewer' || p === 'visualizador');
+  if (restricted && !_consoleLocked){
+    var noop = function(){};
+    console.log = noop;
+    console.warn = noop;
+    console.info = noop;
+    // Mantém console.error funcional para que erros graves apareçam (não vazam dados)
+    _consoleLocked = true;
+  } else if (!restricted && _consoleLocked){
+    console.log = _origConsoleLog;
+    console.warn = _origConsoleWarn;
+    console.info = _origConsoleInfo;
+    _consoleLocked = false;
+  }
+}
+
 // ==================== COUNTRY CODES (for phone international) ====================
 var COUNTRY_CODES=[
 {code:'+55',name:'Brasil',flag:'🇧🇷'},
@@ -654,7 +680,12 @@ try{
   _dbReady = false;
   _lastSyncStatus = 'loading';
 
-  const tables = [
+  // Perfis restritos só carregam o que precisam (Estoque + Biblioteca)
+  var perfil = (S.currentUser && S.currentUser.perfil) || '';
+  var perfilRestrito = (perfil === 'editor' || perfil === 'viewer' || perfil === 'visualizador');
+  var quiet = perfilRestrito; // suprime console.log para esses perfis
+
+  const tablesAll = [
     {key:'pessoas', map:pessoaFromDB},
     {key:'consulentes', map:consFromDB},
     {key:'vendas', map:vendaFromDB},
@@ -666,6 +697,16 @@ try{
     {key:'items', map:itemFromDB}
   ];
 
+  // Editor/visualizador só veem livros e items
+  const tables = perfilRestrito
+    ? tablesAll.filter(function(t){return ['livros','items'].indexOf(t.key)>=0})
+    : tablesAll;
+
+  // Garante que tabelas não carregadas existem como array vazio
+  ['pessoas','consulentes','vendas','ciclos','interacoes','crediarios','rituais','livros','items'].forEach(function(k){
+    if(!Array.isArray(S[k])) S[k] = [];
+  });
+
   for (const t of tables){
 
     // Paginação para tabelas que possam ter > 1000 linhas (limite padrão do PostgREST)
@@ -675,7 +716,7 @@ try{
     while(true){
       const resp = await sbGet(t.key,'?order=id.asc&limit='+PAGE+'&offset='+offset);
       if(!resp.ok){
-        console.log('[LOAD FAIL]', t.key, resp.status);
+        if(!quiet) console.log('[LOAD FAIL]', t.key, resp.status);
         break;
       }
       const page = await resp.json();
@@ -683,54 +724,69 @@ try{
       allRows = allRows.concat(page);
       if(page.length < PAGE)break;
       offset += PAGE;
-      if(offset > 50000){console.warn('[LOAD] safety stop at 50k for',t.key);break}
+      if(offset > 50000){if(!quiet) console.warn('[LOAD] safety stop at 50k for',t.key);break}
     }
 
     S[t.key] = t.map ? allRows.map(t.map) : allRows;
 
-    console.log('[LOAD]', t.key, S[t.key].length);
+    if(!quiet) console.log('[LOAD]', t.key, S[t.key].length);
   }
 
-  // ================= HISTÓRICO =================
-  try{
-    const rh = await sbGet('historico','?order=created_at.desc&limit=500');
-    if(rh.ok){
-      const dh = await rh.json();
-      S.history = dh.map(r => ({
-        action: r.action,
-        user: r.username,
-        time: r.created_at ? new Date(r.created_at).toLocaleString('pt-BR') : ''
-      }));
-    }
-  }catch(e){}
+  // ================= HISTÓRICO ================= (só admin/staff)
+  if(!perfilRestrito){
+    try{
+      const rh = await sbGet('historico','?order=created_at.desc&limit=500');
+      if(rh.ok){
+        const dh = await rh.json();
+        S.history = dh.map(r => ({
+          action: r.action,
+          user: r.username,
+          time: r.created_at ? new Date(r.created_at).toLocaleString('pt-BR') : ''
+        }));
+      }
+    }catch(e){}
+  } else {
+    S.history = [];
+  }
 
-  // ================= NOTIFICAÇÕES =================
-  try{
-    const rn = await sbGet('notificacoes','?order=created_at.desc&limit=100');
-    if(rn.ok){
-      const dn = await rn.json();
-      S.notifications = dn.map(r => ({
-        tipo: r.tipo,
-        nome: r.nome,
-        msg: r.msg,
-        time: r.created_at ? new Date(r.created_at).toLocaleString('pt-BR') : ''
-      }));
-    }
-  }catch(e){}
+  // ================= NOTIFICAÇÕES ================= (só admin/staff)
+  if(!perfilRestrito){
+    try{
+      const rn = await sbGet('notificacoes','?order=created_at.desc&limit=100');
+      if(rn.ok){
+        const dn = await rn.json();
+        S.notifications = dn.map(r => ({
+          tipo: r.tipo,
+          nome: r.nome,
+          msg: r.msg,
+          time: r.created_at ? new Date(r.created_at).toLocaleString('pt-BR') : ''
+        }));
+      }
+    }catch(e){}
+  } else {
+    S.notifications = [];
+  }
 
   // ================= PEDIDOS DE EXCLUSÃO =================
-  try{
-    const rp = await sbGet('pedidos_exclusao','?order=solicitado_em.desc&limit=200');
-    if(rp.ok){
-      S.pedidosExclusao = await rp.json();
-      console.log('[LOAD] pedidos_exclusao', S.pedidosExclusao.length);
-    }
-  }catch(e){console.warn('pedidos_exclusao não carregou:',e.message)}
+  // Editor precisa ver os próprios pedidos para saber se já solicitou exclusão de algo
+  // Admin precisa ver todos para aprovar
+  // Visualizador não precisa
+  if(perfil !== 'viewer' && perfil !== 'visualizador'){
+    try{
+      const rp = await sbGet('pedidos_exclusao','?order=solicitado_em.desc&limit=200');
+      if(rp.ok){
+        S.pedidosExclusao = await rp.json();
+        if(!quiet) console.log('[LOAD] pedidos_exclusao', S.pedidosExclusao.length);
+      }
+    }catch(e){if(!quiet) console.warn('pedidos_exclusao não carregou:',e.message)}
+  } else {
+    S.pedidosExclusao = [];
+  }
 
   _dbReady = true;
   _lastSyncStatus = 'ok';
 
-  console.log('[LOADALL COMPLETE]');
+  if(!quiet) console.log('[LOADALL COMPLETE]');
 
 }catch(e){
   console.log('[LOAD ERROR]', e);
@@ -1057,7 +1113,7 @@ function renderLogin(){return '<div class="login-wrap"><div class="login-card"><
 function bindLogin(){var eb=document.getElementById('eyeBtn'),lp=document.getElementById('loginPass');if(eb)eb.onclick=function(){lp.type=lp.type==='password'?'text':'password'};document.getElementById('loginBtn').onclick=doLogin;document.getElementById('loginUser').onkeydown=function(e){if(e.key==='Enter')doLogin()};lp.onkeydown=function(e){if(e.key==='Enter')doLogin()}}
 async function doLogin(){var u=document.getElementById('loginUser').value.trim(),p=document.getElementById('loginPass').value;
 var user=await dbLogin(u,p);
-if(user){S.currentUser=user;S.activeTab=(user.perfil==='editor')?'gerenciar':((user.perfil==='viewer'||user.perfil==='visualizador')?'gerenciar':'dashboard');addHistDB('Login');render();checkAlerts()}
+if(user){S.currentUser=user;_lockConsoleIfRestricted();S.activeTab=(user.perfil==='editor')?'gerenciar':((user.perfil==='viewer'||user.perfil==='visualizador')?'gerenciar':'dashboard');addHistDB('Login');render();checkAlerts()}
 else{document.getElementById('loginError').style.display='block'}}
 
 function renderHeader(){
@@ -2418,6 +2474,7 @@ if (_sb) {
           authUser: user
         };
 
+        _lockConsoleIfRestricted();
         console.log('[AUTH] Session restored: ' + S.currentUser.username);
       }
     }
