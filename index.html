@@ -1011,7 +1011,15 @@ function agendarGoogle(tipo,dados){console.log('[GOOGLE AGENDA] '+tipo+': '+JSON
 function checkAlerts(){var h=today();S.consulentes.forEach(function(c){if(c.dataConsulta===h&&c.statusFluxo==='aguardando_consulta')sendWhats('lembrete_24h',{Nome:c.nomeCompleto})})}
 function getPrescAlerts(){var alerts=[];var h=today();S.consulentes.forEach(function(c){if(c.statusFluxo==='aguardando_prescricao'&&c.dataConsulta){var d=daysDiff(c.dataConsulta,h);if(d>=3)alerts.push({consulente:c,dias:d,level:d>=7?'danger':d>=5?'warning':'info'})}});return alerts}
 
-function getFilteredItems(){var it=S.items.slice();if(S.filterSecao)it=it.filter(function(i){return i.secao===S.filterSecao});if(S.filterTipo)it=it.filter(function(i){return i.tipo===S.filterTipo});if(S.search.trim())it=it.filter(function(i){return fuzzy(S.search,i.nome+' '+i.tipo+' '+i.localizacao)});return it}
+function getFilteredItems(){
+var it=S.items.slice();
+if(S.filterSecao)it=it.filter(function(i){return i.secao===S.filterSecao});
+if(S.filterTipo)it=it.filter(function(i){return i.tipo===S.filterTipo});
+if(S.filterEstoque==='com')it=it.filter(function(i){return (parseFloat(i.estoqueAtual)||0)>0});
+else if(S.filterEstoque==='sem')it=it.filter(function(i){return (parseFloat(i.estoqueAtual)||0)===0});
+else if(S.filterEstoque==='critico')it=it.filter(function(i){var q=parseFloat(i.estoqueAtual)||0,m=parseFloat(i.estoqueMinimo)||0;return m>0&&q<=m});
+if(S.search.trim())it=it.filter(function(i){return fuzzy(S.search,i.nome+' '+i.tipo+' '+i.localizacao)});
+return it}
 function getFilteredPessoas(){var l=S.pessoas.slice();if(S.search.trim())l=l.filter(function(p){return fuzzy(S.search,p.nome+' '+(p.telefone||''))});return l}
 function paginate(a){var s=(S.page-1)*S.perPage;return a.slice(s,s+S.perPage)}
 
@@ -1465,14 +1473,21 @@ var secoesDist={};S.items.forEach(function(i){if(i.secao)secoesDist[i.secao]=tru
 var nTipos=Object.keys(tiposDist).length;
 var nSecoes=Object.keys(secoesDist).length;
 var critColor=criticos>0?'var(--danger)':'var(--text3)';
+var fe=S.filterEstoque||'';
+function rcStyle(active,borderColor){
+return 'cursor:pointer;border-left-color:'+borderColor+';transition:all .15s'+(active?';background:'+borderColor+'15;box-shadow:0 0 0 2px '+borderColor:'')}
 stats='<div class="report-cards">'+
-'<div class="report-card" style="border-left-color:var(--accent)"><div class="rc-label">Total</div><div class="rc-value">'+total+'</div></div>'+
-'<div class="report-card" style="border-left-color:var(--success)"><div class="rc-label">Com estoque</div><div class="rc-value">'+comEstoque+'</div></div>'+
-'<div class="report-card" style="border-left-color:#7F8C8D"><div class="rc-label">Sem estoque</div><div class="rc-value">'+semEstoque+'</div></div>'+
-'<div class="report-card" style="border-left-color:'+critColor+'"><div class="rc-label">Críticos '+(criticos>0?'⚠':'')+'</div><div class="rc-value" style="color:'+critColor+'">'+criticos+'</div></div>'+
-'<div class="report-card" style="border-left-color:var(--info)"><div class="rc-label">Tipos</div><div class="rc-value">'+nTipos+'</div></div>'+
-'<div class="report-card" style="border-left-color:#9B59B6"><div class="rc-label">Seções</div><div class="rc-value">'+nSecoes+'</div></div>'+
-'</div>'}
+'<div class="report-card" onclick="setFilterEstoque(\'\')" style="'+rcStyle(fe===''&&!S.filterTipo&&!S.filterSecao&&!S.search.trim(),'var(--accent)')+'"><div class="rc-label">Total</div><div class="rc-value">'+total+'</div></div>'+
+'<div class="report-card" onclick="setFilterEstoque(\'com\')" style="'+rcStyle(fe==='com','var(--success)')+'"><div class="rc-label">Com estoque</div><div class="rc-value">'+comEstoque+'</div></div>'+
+'<div class="report-card" onclick="setFilterEstoque(\'sem\')" style="'+rcStyle(fe==='sem','#7F8C8D')+'"><div class="rc-label">Sem estoque</div><div class="rc-value">'+semEstoque+'</div></div>'+
+'<div class="report-card" onclick="setFilterEstoque(\'critico\')" style="'+rcStyle(fe==='critico',critColor)+'"><div class="rc-label">Críticos '+(criticos>0?'⚠':'')+'</div><div class="rc-value" style="color:'+critColor+'">'+criticos+'</div></div>'+
+'<div class="report-card" style="border-left-color:var(--info);cursor:default"><div class="rc-label">Tipos</div><div class="rc-value">'+nTipos+'</div></div>'+
+'<div class="report-card" style="border-left-color:#9B59B6;cursor:default"><div class="rc-label">Seções</div><div class="rc-value">'+nSecoes+'</div></div>'+
+'</div>';
+if(fe){
+var labelF=fe==='com'?'Com estoque':fe==='sem'?'Sem estoque':fe==='critico'?'Críticos':'';
+stats+='<div style="background:#FEF9E7;border-left:3px solid var(--accent);padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:13px;display:flex;align-items:center;justify-content:space-between"><span><strong>Filtro ativo:</strong> '+labelF+'</span><button class="btn btn-sm btn-outline" onclick="setFilterEstoque(\'\')">× Limpar</button></div>'}
+}
 return stats+'<div class="search-section"><div class="search-bar"><input class="search-input" placeholder="Buscar item..." value="'+esc(S.search)+'" id="searchInput"><button class="btn btn-primary" onclick="doSearch()">Buscar</button>'+ab+'</div><div class="filters"><select onchange="S.filterSecao=this.value;S.page=1;render()"><option value="">Todas</option>'+so+'</select><select onchange="S.filterTipo=this.value;S.page=1;render()"><option value="">Todos</option>'+to+'</select></div><div class="result-count">'+fi.length+'</div></div>'+renderItemTable(pg,fi.length,ed)}
 function renderItemTable(it,tot,ed){if(!it.length)return '<div class="table-wrap"><div class="empty-state">Nenhum</div></div>';var pp=Math.ceil(tot/S.perPage);var isEditor=S.currentUser&&S.currentUser.perfil==='editor';return '<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>#</th><th>Nome</th><th>Tipo</th><th>Seção</th><th>Local</th><th>Estoque</th><th>Cadastrado</th>'+(ed?'<th>Ações</th>':'')+'</tr></thead><tbody>'+it.map(function(i){var pendente=hasPedidoPendente('item',i.id);var qtd=parseFloat(i.estoqueAtual)||0;var qtdMin=parseFloat(i.estoqueMinimo)||0;var critico=qtdMin>0&&qtd<=qtdMin;var estoqueStr=fmtEstoque(i);var estoqueColor=critico?'color:var(--danger);font-weight:700':qtd===0?'color:var(--text3)':'';return '<tr'+(pendente?' style="opacity:.6"':'')+'><td>'+i.id+'</td><td style="font-weight:500">'+esc(i.nome)+(pendente?' <span style="background:#FEF5E7;color:#B9770E;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600">⏳ aguardando exclusão</span>':'')+'</td><td><span class="tipo-badge '+tipoClass(i.tipo)+'">'+esc(i.tipo)+'</span></td><td>'+esc(i.secao)+'</td><td>'+esc(i.localizacao)+'</td><td style="font-size:13px;'+estoqueColor+'">'+estoqueStr+(critico?' ⚠':'')+'</td><td>'+auditCell(i)+'</td>'+(ed?'<td><div class="actions-cell"><button class="edit-btn btn-sm" onclick="openEditItem('+i.id+')">Editar</button>'+(pendente?'':(isEditor?'<button class="del-btn btn-sm" style="background:#F39C12;color:#fff;border-color:#F39C12" onclick="solicitarExclusao(\'item\','+i.id+')" title="Solicitar exclusão ao admin">⏳</button>':'<button class="del-btn btn-sm" onclick="confirmDel(\'item\','+i.id+')">X</button>'))+'</div></td>':'')+'</tr>'}).join('')+'</tbody></table></div>'+(pp>1?renderPag(pp):'')+'</div>'}
 function renderPag(pp){var b='',s=Math.max(1,S.page-3),e=Math.min(pp,S.page+3);if(S.page>1)b+='<button class="page-btn" onclick="S.page='+(S.page-1)+';render()">\u2039</button>';for(var i=s;i<=e;i++)b+='<button class="page-btn'+(i===S.page?' active':'')+'" onclick="S.page='+i+';render()">'+i+'</button>';if(S.page<pp)b+='<button class="page-btn" onclick="S.page='+(S.page+1)+';render()">\u203A</button>';return '<div class="pagination">'+b+'</div>'}
@@ -1915,9 +1930,10 @@ if(S.currentUser&&S.currentUser.perfil==='editor'){
 if(['gerenciar','biblioteca'].indexOf(t)<0){toast('Acesso restrito','error');return}}
 else if(S.currentUser&&(S.currentUser.perfil==='viewer'||S.currentUser.perfil==='visualizador')){
 if(['busca','gerenciar','biblioteca'].indexOf(t)<0){toast('Acesso restrito','error');return}}
-S.activeTab=t;S.search='';S.filterSecao='';S.filterTipo='';S.filterStatus='';S.filterGenero='';S.filterTipoLivro='';S.filterSecaoLivro='';S.page=1;render()};
+S.activeTab=t;S.search='';S.filterSecao='';S.filterTipo='';S.filterStatus='';S.filterGenero='';S.filterTipoLivro='';S.filterSecaoLivro='';S.filterEstoque='';S.page=1;render()};
 window.doLogout=async function(){addHistDB('Logout');await authSignOut();S.currentUser=null;render()};
 window.doSearch=function(){var si=document.getElementById('searchInput');if(si)S.search=si.value;S.page=1;render()};
+window.setFilterEstoque=function(f){S.filterEstoque=f;S.page=1;render()};
 window.closeModal=function(){S.modal=null;S.editItem=null;S.editUser=null;S.editConsulente=null;S.confirmText='';S.confirmAction=null;S.flowType=null;S.flowPessoaId=null;render()};
 
 window.openAddItem=function(){S.editItem=null;S.modal='addItem';render()};
