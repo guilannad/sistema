@@ -847,10 +847,16 @@ async function forceLoad(){
 
 }
 async function loadUsuarios(){
-try{var resp=await sbGet('usuarios','?order=username.asc');
-if(resp.ok){S._authUsers=(await resp.json()).map(function(u){return {username:u.username,perfil:u.perfil,email:u.username+'@ilefagbemi.local'}});render();return}
-}catch(e){}
-// Fallback: list from Supabase Auth metadata if usuarios table is empty
+try{
+  var resp=await sbGet('usuarios','?order=username.asc');
+  if(resp.ok){
+    S._authUsers=(await resp.json()).map(function(u){
+      return {username:u.username, perfil:u.perfil, email:u.email||''}
+    });
+    render();
+    return;
+  }
+}catch(e){console.error('[loadUsuarios]',e)}
 S._authUsers=S._authUsers||[];render()}
 window.loadUsuarios=loadUsuarios;
 
@@ -1865,7 +1871,14 @@ return h}
 
 function mAddCiclo(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Novo Ciclo</h3><div class="form-group"><label>Obs</label><textarea id="ciObs" rows="3"></textarea></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveNewCiclo()">Criar</button></div></div></div>'}
 function mInter(){var isE=S.modal==='editInter';var e=isE?S.interacoes.find(function(x){return x.id===S.editItem}):null;return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>'+(isE?'Editar':'Nova')+' Interação</h3><div class="form-group"><label>Tipo</label><select id="itTipo">'+TIPO_INTERACAO.map(function(t){return '<option value="'+t+'"'+(e&&e.tipo===t?' selected':'')+'>'+interLabel(t)+'</option>'}).join('')+'</select></div><div class="form-group"><label>Data</label><input type="date" id="itData" value="'+(e?e.data:today())+'"></div><div class="form-group"><label>Desc</label><textarea id="itDesc" rows="3">'+esc(e?e.descricao:'')+'</textarea></div><div class="form-group"><label>Valor</label><input id="itVal" value="'+esc(e?e.valor:'')+'"></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveInter()">Salvar</button></div></div></div>'}
-function mUser(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Novo Usuário</h3><div class="form-group"><label>Usuário</label><input id="mUser2"></div><div class="form-group"><label>Senha</label><div class="input-wrap"><input id="mPass" type="password" placeholder="Digite a senha"><button class="eye-btn" onclick="var i=document.getElementById(\'mPass\');i.type=i.type===\'password\'?\'text\':\'password\'">\u{1F441}\uFE0F</button></div></div><div class="form-group"><label>Confirmar senha</label><div class="input-wrap"><input id="mPassConf" type="password" placeholder="Repita a senha"><button class="eye-btn" onclick="var i=document.getElementById(\'mPassConf\');i.type=i.type===\'password\'?\'text\':\'password\'">\u{1F441}\uFE0F</button></div></div><div class="form-group"><label>Perfil</label><select id="mPerfil">'+PERFIS.map(function(p){return '<option>'+p+'</option>'}).join('')+'</select></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveUser()">Criar</button></div></div></div>'}
+function mUser(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Vincular Perfil de Usuário</h3>'+
+'<div style="background:#FEF5E7;border-left:3px solid #F39C12;padding:10px 12px;border-radius:6px;margin-bottom:12px;font-size:12px;line-height:1.5">'+
+'<strong>Pré-requisito:</strong> o usuário já deve estar cadastrado no <em>Supabase Auth</em> (Authentication → Users). Esta tela apenas <strong>vincula um perfil de aplicação</strong> ao email já existente.'+
+'</div>'+
+'<div class="form-group"><label>Username (livre, sem espaços)</label><input id="mUser2" placeholder="ex: maria.silva"></div>'+
+'<div class="form-group"><label>Email cadastrado no Supabase Auth</label><input id="mUserEmail" type="email" placeholder="email@dominio.com"></div>'+
+'<div class="form-group"><label>Perfil de aplicação</label><select id="mPerfil">'+PERFIS.map(function(p){return '<option>'+p+'</option>'}).join('')+'</select></div>'+
+'<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="saveUser()">Vincular</button></div></div></div>'}
 function mPwd(){return '<div class="modal-overlay"'+MO()+'><div class="modal"><h3>Alterar Senha - '+esc(S.editUser)+'</h3><div class="form-group"><label>Nova senha</label><div class="input-wrap"><input id="mNewPwd" type="password" placeholder="Digite a nova senha"><button class="eye-btn" onclick="var i=document.getElementById(\'mNewPwd\');i.type=i.type===\'password\'?\'text\':\'password\'">\u{1F441}\uFE0F</button></div></div><div class="form-group"><label>Confirmar nova senha</label><div class="input-wrap"><input id="mNewPwdConf" type="password" placeholder="Repita a nova senha"><button class="eye-btn" onclick="var i=document.getElementById(\'mNewPwdConf\');i.type=i.type===\'password\'?\'text\':\'password\'">\u{1F441}\uFE0F</button></div></div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="doChgPwd()">Alterar</button></div></div></div>'}
 function mConfirm(){return '<div class="modal-overlay"><div class="modal"><div style="font-size:15px;line-height:1.5;margin-bottom:20px">'+S.confirmText+'</div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-danger" onclick="S.confirmAction();closeModal()">Confirmar</button></div></div></div>'}
 function mConfirmConsulta(){var c=S.editConsulente;if(!c)return '';var tl=(c.tipoConsulta==='urgencia')?'Urgência':'Normal';var fl={'pix_avista':'PIX à vista','pix_50_50':'PIX 50%+50%','link_mercadopago':'Link Mercado Pago','cartao':'Cartão'}[c.formaPagamento]||c.formaPagamento||'';var pt=c.statusPagamento==='pago'?'Efetuado':'Pendente';var wt='*Confirmação de consulta*\n'+c.nomeCompleto+'\n'+(c.nomeMae?'filho(a) de '+c.nomeMae+'\n':'')+(c.dataNascimento?'Nascido(a) em '+fmtDate(c.dataNascimento)+'\n':'')+'Data da consulta: '+fmtDate(c.dataConsulta)+'\n'+(c.horarioConsulta?'Horário: '+c.horarioConsulta+'\n':'')+(c.formatoConsulta?'Formato: '+c.formatoConsulta+'\n':'')+'Modalidade: '+tl+'\nValor: R$'+(c.valorCobrado||0).toFixed(2)+'\nPagamento: '+pt+(fl?' via '+fl:'')+'.';return '<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal modal-wide"><h3>Confirmar Consulta</h3><div class="detail-grid"><div><div class="dl">Consulente</div><div class="dv">'+esc(c.nomeCompleto)+'</div></div><div><div class="dl">Mãe</div><div class="dv">'+esc(c.nomeMae||'—')+'</div></div><div><div class="dl">Nascimento</div><div class="dv">'+fmtDate(c.dataNascimento)+'</div></div><div><div class="dl">Data Consulta</div><div class="dv">'+fmtDate(c.dataConsulta)+'</div></div><div><div class="dl">Horário</div><div class="dv">'+esc(c.horarioConsulta||'—')+'</div></div><div><div class="dl">Formato</div><div class="dv">'+esc(c.formatoConsulta||'—')+'</div></div><div><div class="dl">Modalidade</div><div class="dv">'+tl+'</div></div><div><div class="dl">Valor Cobrado</div><div class="dv">R$'+(c.valorCobrado||0).toFixed(2)+'</div></div><div><div class="dl">Valor Recebido</div><div class="dv">R$'+(c.valorRecebido||0).toFixed(2)+'</div></div><div><div class="dl">Pagamento</div><div class="dv"><span class="pag-badge pag-'+c.statusPagamento+'">'+pagLabel(c.statusPagamento)+'</span></div></div><div><div class="dl">Telefone</div><div class="dv">'+esc(c.telefoneWhatsApp||'—')+'</div></div></div><div style="margin-top:16px"><div style="font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;margin-bottom:6px">Texto para WhatsApp (clique para copiar)</div><div id="whatsConfirmText" onclick="copyWhatsConfirm()" style="background:var(--bg);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px;font-size:13px;line-height:1.7;white-space:pre-wrap;cursor:pointer">'+esc(wt)+'</div><div id="copyFeedback" style="font-size:11px;color:var(--success);margin-top:4px;opacity:0;transition:opacity .3s">✔ Copiado!</div></div><div style="background:var(--success-bg);padding:12px;border-radius:var(--radius);margin-top:16px;font-size:13px;color:var(--success)">Ao confirmar, o status será alterado para <strong>Aguardando Prescrição</strong>.</div><div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-success" onclick="doConfirmConsulta()">Confirmar Consulta</button></div></div></div>'}
@@ -2506,12 +2519,39 @@ else if(type==='inter'){S.confirmText='Excluir?';S.confirmAction=function(){S.in
 S.modal='confirm';render()};
 
 window.openAddUser=function(){S.modal='addUser';render()};
-window.saveUser=async function(){var u=document.getElementById('mUser2').value.trim(),p=document.getElementById('mPass').value,pc=document.getElementById('mPassConf').value,pf=document.getElementById('mPerfil').value;if(!u||!p)return toast('Preencha usuário e senha!','error');if(p!==pc)return toast('As senhas não coincidem!','error');if(p.length<6)return toast('Senha mínima: 6 caracteres!','error');
-if(!_sb)return toast('Sistema não inicializado','error');
-var email=u.indexOf('@')>=0?u:u+'@ilefagbemi.local';
-var sr=await authSignUp(email,p,{perfil:pf,username:u});
-if(!sr||!sr.user)return toast('Erro ao criar usuário no Supabase Auth','error');
-addHistDB('+ Usuário: '+u);toast('Usuário criado!');await loadUsuarios();closeModal()};
+window.saveUser=async function(){
+var u=document.getElementById('mUser2').value.trim();
+var em=document.getElementById('mUserEmail').value.trim().toLowerCase();
+var pf=document.getElementById('mPerfil').value;
+if(!u)return toast('Informe o username','error');
+if(/\s/.test(u))return toast('Username não pode ter espaços','error');
+if(u.length<3)return toast('Username muito curto (mínimo 3)','error');
+if(!em||em.indexOf('@')<0)return toast('Informe um email válido','error');
+if(!pf)return toast('Escolha um perfil','error');
+// Checa duplicata local
+if((S._authUsers||[]).find(function(x){return x.username===u}))return toast('Já existe um vínculo com este username','error');
+// INSERT na tabela usuarios (autenticação real fica no Supabase Auth — aqui só perfil)
+try{
+  var hdr=await getAuthHeaders('return=representation');
+  var r=await fetch(SUPABASE_URL+'/rest/v1/usuarios',{
+    method:'POST',
+    headers:hdr,
+    body:JSON.stringify({username:u,perfil:pf,email:em})
+  });
+  if(!r.ok){
+    var body='';try{body=await r.text()}catch(e){}
+    console.error('[saveUser FAIL]',r.status,body);
+    if(r.status===409||body.indexOf('duplicate')>=0)return toast('Já existe usuário com este username/email','error');
+    return toast('Erro ao vincular perfil ('+r.status+')','error');
+  }
+  addHistDB('+ Perfil vinculado: '+u+' ('+pf+') — '+em);
+  toast('Perfil vinculado com sucesso!');
+  await loadUsuarios();
+  closeModal();
+}catch(e){
+  console.error('[saveUser]',e);
+  toast('Erro de conexão: '+e.message,'error');
+}};
 window.openChgPwd=function(un){S.editUser=un;S.modal='chgPwd';render()};
 window.doChgPwd=async function(){var np=document.getElementById('mNewPwd').value;var nc=document.getElementById('mNewPwdConf').value;if(!np)return toast('Digite a nova senha!','error');if(np.length<6)return toast('Senha mínima: 6 caracteres!','error');if(np!==nc)return toast('As senhas não coincidem!','error');try{await sbRpc('change_password',{p_username:S.editUser,p_new_password:np})}catch(e){}addHistDB('Senha alterada: '+S.editUser);toast('Senha alterada!');closeModal()};
 window.removeVendaItem=function(i){S.vendaItems.splice(i,1);if(!S.vendaItems.length)S.vendaItems=[{nome:'',qtd:1,valorUnit:0}];render()};
