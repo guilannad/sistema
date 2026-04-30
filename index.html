@@ -683,7 +683,8 @@ try{
   // Perfis restritos só carregam o que precisam (Estoque + Biblioteca)
   var perfil = (S.currentUser && S.currentUser.perfil) || '';
   var perfilRestrito = (perfil === 'editor' || perfil === 'viewer' || perfil === 'visualizador');
-  var quiet = perfilRestrito; // suprime console.log para esses perfis
+  // Se ainda não há perfil definido (boot inicial sem login), mantém silencioso por segurança
+  var quiet = perfilRestrito || !perfil;
 
   const tablesAll = [
     {key:'pessoas', map:pessoaFromDB},
@@ -908,7 +909,11 @@ async function migrateToTables() {
 
     _lastSyncStatus = 'loading';
 
-    await loadAll();
+    // Só carrega dados se já houver sessão ativa
+    // (caso contrário aguarda o login do usuário)
+    if (S.currentUser) {
+      await loadAll();
+    }
 
     render();
 
@@ -1324,7 +1329,11 @@ if(!confirm('Finalizar e arquivar venda #'+id+'?\n\nA venda some do kanban mas c
 v.arquivado=true;
 var ok=await saveRecord('vendas',v.id,vendaToDB(v));
 if(ok){addHistDB('Venda #'+id+' arquivada');toast('Venda arquivada')}
-else{v.arquivado=false;toast('Falha ao arquivar','error')}
+else{
+  v.arquivado=false;
+  toast('Falha ao arquivar — verifique se a coluna "arquivado" foi criada no Supabase (rode vendas_arquivado.sql)','error');
+  console.error('[ARQUIVAR] Falha. Provável causa: coluna "arquivado" não existe na tabela vendas. Execute vendas_arquivado.sql no Supabase.')
+}
 render()};
 
 window.desarquivarVenda=async function(id){
@@ -1508,10 +1517,46 @@ var creds=S.crediarios||[];
 var h='<div style="margin-bottom:12px"><button class="btn btn-primary" onclick="openAddCrediario()">+ Novo Crediário</button></div>';
 if(!creds.length)return h+'<div class="empty-state">Nenhum crediário</div>';
 creds.forEach(function(cr){var p=getPessoa(cr.pessoaId);var pago=0;(cr.pagamentos||[]).forEach(function(pg){pago+=parseFloat(pg.valor)||0});var restante=cr.valorTotal-pago;
-h+='<div class="crediario-card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div><strong>'+esc(p?p.nome:'')+'</strong> \u2022 '+fmtDate(cr.data)+'<br><span style="font-size:12px;color:var(--text2)">'+esc(cr.descricao||'')+'</span></div><div style="text-align:right"><div style="font-size:18px;font-weight:700;color:var(--accent)">R$'+cr.valorTotal.toFixed(2)+'</div><div style="font-size:12px">Pago: R$'+pago.toFixed(2)+' \u2022 Resta: R$'+restante.toFixed(2)+'</div></div></div>';
-if(cr.pagamentos&&cr.pagamentos.length){h+='<div style="margin-top:8px;font-size:12px">';cr.pagamentos.forEach(function(pg,idx){h+='<div style="padding:6px 0;border-top:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;gap:8px"><div>'+fmtDate(pg.data)+' \u2022 R$'+pg.valor+' \u2022 '+esc(pg.forma||'')+'</div>'+(pg.comprovante?'<button class="btn btn-sm btn-info" onclick="viewComprovante('+cr.id+','+idx+')">Comprovante</button>':'<span style="color:var(--text3)">Sem comprovante</span>')+'</div>'});h+='</div>'}
-h+='<div style="margin-top:8px"><button class="btn btn-sm btn-success" onclick="addPagCrediario('+cr.id+')">+ Pagamento</button></div></div>'});
+h+='<div class="crediario-card"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px"><div style="flex:1;min-width:200px"><strong>'+esc(p?p.nome:'')+'</strong> \u2022 '+fmtDate(cr.data)+'<br><span style="font-size:12px;color:var(--text2)">'+esc(cr.descricao||'')+'</span></div><div style="text-align:right"><div style="font-size:18px;font-weight:700;color:var(--accent)">R$'+cr.valorTotal.toFixed(2)+'</div><div style="font-size:12px">Pago: R$'+pago.toFixed(2)+' \u2022 Resta: R$'+restante.toFixed(2)+'</div></div></div>';
+if(cr.pagamentos&&cr.pagamentos.length){h+='<div style="margin-top:8px;font-size:12px">';cr.pagamentos.forEach(function(pg,idx){h+='<div style="padding:6px 0;border-top:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap"><div>'+fmtDate(pg.data)+' \u2022 R$'+pg.valor+' \u2022 '+esc(pg.forma||'')+'</div><div style="display:flex;gap:4px">'+(pg.comprovante?'<button class="btn btn-sm btn-info" onclick="viewComprovante('+cr.id+','+idx+')">Comprovante</button>':'<span style="color:var(--text3)">Sem comprovante</span>')+'<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="excluirPagCrediario('+cr.id+','+idx+')" title="Excluir este pagamento">×</button></div></div>'});h+='</div>'}
+h+='<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-success" onclick="addPagCrediario('+cr.id+')">+ Pagamento</button><button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="excluirCrediario('+cr.id+')">Excluir Crediário</button></div></div>'});
 return h}
+
+window.excluirCrediario=function(id){
+var cr=S.crediarios.find(function(c){return c.id===id});if(!cr)return;
+var p=getPessoa(cr.pessoaId);
+var pago=(cr.pagamentos||[]).reduce(function(a,b){return a+(parseFloat(b.valor)||0)},0);
+S.confirmText='<strong>Excluir crediário de '+esc(p?p.nome:'')+'?</strong><br>Valor total: R$'+cr.valorTotal.toFixed(2)+'<br>'+(pago>0?'<span style="color:var(--danger)">⚠ Há R$'+pago.toFixed(2)+' já pago(s) registrado(s) — esses pagamentos também serão removidos.</span><br>':'')+'Esta ação é irreversível.';
+S.confirmAction=async function(){
+  var ok=await deleteRecord('crediarios',id);
+  if(ok){
+    S.crediarios=S.crediarios.filter(function(x){return x.id!==id});
+    addHistDB('- Crediário excluído: '+(p?p.nome:'')+' R$'+cr.valorTotal.toFixed(2));
+    toast('Crediário excluído','info')
+  }else{
+    toast('Falha ao excluir crediário','error')
+  }
+  render()
+};
+S.modal='confirm';render()};
+
+window.excluirPagCrediario=function(crId,idx){
+var cr=S.crediarios.find(function(c){return c.id===crId});if(!cr||!cr.pagamentos[idx])return;
+var pg=cr.pagamentos[idx];
+S.confirmText='<strong>Excluir este pagamento?</strong><br>Data: '+fmtDate(pg.data)+'<br>Valor: R$'+pg.valor+'<br>Forma: '+esc(pg.forma||'')+'<br>Esta ação é irreversível.';
+S.confirmAction=async function(){
+  cr.pagamentos.splice(idx,1);
+  var ok=await saveRecord('crediarios',cr.id,credToDB(cr));
+  if(ok){
+    addHistDB('- Pagamento crediário removido: R$'+pg.valor);
+    toast('Pagamento removido','info')
+  }else{
+    cr.pagamentos.splice(idx,0,pg); // restaura
+    toast('Falha ao remover pagamento','error')
+  }
+  render()
+};
+S.modal='confirm';render()};
 
 // ==================== MODALS ====================
 function renderModal(){var m=S.modal;
