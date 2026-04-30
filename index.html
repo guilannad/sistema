@@ -1379,7 +1379,50 @@ if(S.modal)h+=renderModal();
 if(S.toast)h+='<div class="toast toast-'+S.toast.type+'">'+esc(S.toast.msg)+'</div>';
 app.innerHTML=h;bindAll()}
 
-function renderLogin(){return '<div class="login-wrap"><div class="login-card"><span style="font-size:42px;display:block;margin-bottom:12px">\u{1F3DB}\uFE0F</span><h1 style="font-family:Playfair Display,serif;font-size:26px;color:var(--accent)">Ilé Ifagbemi Brasil</h1><p style="color:var(--text2);font-size:14px;margin-bottom:28px">Sistema de Gestão</p><div class="login-error" id="loginError">Usuário ou senha incorretos</div><div class="form-group"><label>Usuário</label><div class="input-wrap"><input type="text" id="loginUser" placeholder="Seu usuário"></div></div><div class="form-group"><label>Senha</label><div class="input-wrap"><input type="password" id="loginPass" placeholder="Sua senha"><button class="eye-btn" id="eyeBtn">\u{1F441}\uFE0F</button></div></div><button class="btn btn-primary login-btn" id="loginBtn" style="width:100%;padding:12px;font-size:15px;font-weight:600;margin-top:8px">Entrar</button><div style="text-align:center;margin-top:16px"><a href="#" onclick="esqueciSenha();return false" style="color:var(--accent);font-size:13px;text-decoration:none">Esqueci minha senha</a></div></div></div>'}
+function renderLogin(){
+var erroBanner='';
+if(S._erroAuth){
+var e=S._erroAuth;
+var msg='';
+if(e.codigo==='otp_expired')msg='O link de redefinição de senha <strong>expirou ou já foi usado</strong>. Solicite um novo link clicando em "Esqueci minha senha".';
+else if(e.codigo==='access_denied')msg='<strong>Acesso negado.</strong> '+(e.descricao||'O link pode ter sido usado mais de uma vez ou estar inválido.');
+else msg='<strong>Erro de autenticação:</strong> '+(e.descricao||e.codigo||e.erro);
+erroBanner='<div style="background:#FDEDEC;border-left:4px solid #C0392B;padding:12px 14px;border-radius:6px;margin-bottom:16px;font-size:13px;line-height:1.5;text-align:left">⚠ '+msg+'<br><button onclick="limparErroAuth()" style="margin-top:8px;background:none;border:1px solid #C0392B;color:#C0392B;padding:4px 10px;border-radius:4px;font-size:12px;cursor:pointer">Fechar</button></div>';
+}
+return '<div class="login-wrap"><div class="login-card"><span style="font-size:42px;display:block;margin-bottom:12px">\u{1F3DB}\uFE0F</span><h1 style="font-family:Playfair Display,serif;font-size:26px;color:var(--accent)">Ilé Ifagbemi Brasil</h1><p style="color:var(--text2);font-size:14px;margin-bottom:28px">Sistema de Gestão</p>'+erroBanner+'<div class="login-error" id="loginError">Usuário ou senha incorretos</div><div class="form-group"><label>Usuário</label><div class="input-wrap"><input type="text" id="loginUser" placeholder="Seu usuário"></div></div><div class="form-group"><label>Senha</label><div class="input-wrap"><input type="password" id="loginPass" placeholder="Sua senha"><button class="eye-btn" id="eyeBtn">\u{1F441}\uFE0F</button></div></div><button class="btn btn-primary login-btn" id="loginBtn" style="width:100%;padding:12px;font-size:15px;font-weight:600;margin-top:8px">Entrar</button><div style="text-align:center;margin-top:16px"><a href="#" onclick="esqueciSenha();return false" style="color:var(--accent);font-size:13px;text-decoration:none">Esqueci minha senha</a></div></div></div>'}
+
+window.limparErroAuth=function(){S._erroAuth=null;render()};
+
+function renderRedefinirSenha(){
+return '<div class="login-wrap"><div class="login-card" style="max-width:480px"><div style="font-size:60px;margin-bottom:8px">🔐</div>'+
+'<h1 style="font-family:Playfair Display,serif;font-size:24px;color:var(--accent);margin-bottom:8px">Redefinir senha</h1>'+
+'<p style="color:var(--text2);font-size:13px;margin-bottom:20px">Digite sua nova senha abaixo. Mínimo 6 caracteres.</p>'+
+'<div class="form-group"><label>Nova senha</label><div class="input-wrap"><input type="password" id="rsNovaSenha" placeholder="Nova senha"></div></div>'+
+'<div class="form-group"><label>Confirme a nova senha</label><div class="input-wrap"><input type="password" id="rsNovaSenhaConf" placeholder="Confirme"></div></div>'+
+'<button class="btn btn-primary" id="rsSalvar" onclick="salvarNovaSenha()" style="width:100%;padding:12px;font-size:15px;font-weight:600;margin-top:8px">Salvar nova senha</button>'+
+'<div style="text-align:center;margin-top:16px"><a href="#" onclick="cancelarRedefinicao();return false" style="color:var(--text2);font-size:13px">Cancelar</a></div>'+
+'</div></div>'}
+
+window.salvarNovaSenha=async function(){
+var s=document.getElementById('rsNovaSenha').value;
+var c=document.getElementById('rsNovaSenhaConf').value;
+if(!s||s.length<6)return alert('A senha precisa ter pelo menos 6 caracteres.');
+if(s!==c)return alert('As senhas não coincidem.');
+try{
+  var r=await _sb.auth.updateUser({password:s});
+  if(r.error)return alert('Erro ao salvar: '+r.error.message);
+  alert('Senha alterada com sucesso!\n\nVocê será redirecionado para o login.');
+  S._modoRecuperacaoSenha=false;
+  await _sb.auth.signOut();
+  S.currentUser=null;
+  render();
+}catch(e){alert('Falha: '+e.message);console.error('[updateUser]',e)}};
+
+window.cancelarRedefinicao=async function(){
+S._modoRecuperacaoSenha=false;
+try{await _sb.auth.signOut()}catch(e){}
+S.currentUser=null;
+render()};
 
 function renderDispositivoBloqueado(){
 var u=S._blockedUser||{};
@@ -1418,9 +1461,12 @@ email=email.trim().toLowerCase();
 if(!email||email.indexOf('@')<0)return alert('Email inválido');
 if(!_sb)return alert('Sistema não inicializado');
 try{
-  var r=await _sb.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+window.location.pathname});
+  // Constrói URL de redirect apontando para reset.html (página dedicada ao reset)
+  var basePath=window.location.pathname.replace(/[^/]*$/,''); // pega o diretório atual
+  var resetUrl=window.location.origin+basePath+'reset.html';
+  var r=await _sb.auth.resetPasswordForEmail(email,{redirectTo:resetUrl});
   if(r.error){alert('Erro: '+r.error.message);console.error('[RESET PASSWORD]',r.error);return}
-  alert('Pronto! Verifique seu email '+email+'.\n\nO link de redefinição pode demorar alguns minutos para chegar e às vezes cai no spam.');
+  alert('Pronto! Verifique seu email '+email+'.\n\nO link de redefinição pode demorar alguns minutos para chegar e às vezes cai no spam.\n\nClique no link assim que receber — ele tem validade limitada.');
 }catch(e){alert('Falha ao enviar: '+e.message);console.error('[RESET PASSWORD]',e)}};
 function bindLogin(){var eb=document.getElementById('eyeBtn'),lp=document.getElementById('loginPass');if(eb)eb.onclick=function(){lp.type=lp.type==='password'?'text':'password'};document.getElementById('loginBtn').onclick=doLogin;document.getElementById('loginUser').onkeydown=function(e){if(e.key==='Enter')doLogin()};lp.onkeydown=function(e){if(e.key==='Enter')doLogin()}}
 async function doLogin(){var u=document.getElementById('loginUser').value.trim(),p=document.getElementById('loginPass').value;
@@ -3030,7 +3076,41 @@ _sb.auth.onAuthStateChange(function (event, session) {
   if (event === 'TOKEN_REFRESHED') {
     console.log('[AUTH] Token refreshed');
   }
+
+  // PASSWORD_RECOVERY no index.html: usuário caiu aqui em vez de reset.html.
+  // Faz logout silencioso para não deixar sessão de recovery ativa no app principal.
+  if (event === 'PASSWORD_RECOVERY') {
+    console.log('[AUTH] Recovery event detected on index — redirecting to reset.html');
+    var basePath=window.location.pathname.replace(/[^/]*$/,'');
+    window.location.href=window.location.origin+basePath+'reset.html'+window.location.hash;
+  }
 });
+
+// Detecta erro do Supabase na URL hash (link expirado, inválido, etc.)
+(function detectarErroURL(){
+  try{
+    var hash = window.location.hash || '';
+    if (hash.indexOf('error=') >= 0){
+      var params = new URLSearchParams(hash.substring(1));
+      var erro = params.get('error');
+      var codigo = params.get('error_code');
+      var descr = params.get('error_description');
+      if (erro){
+        S._erroAuth = {
+          erro: erro,
+          codigo: codigo,
+          descricao: descr ? descodificarErro(descr) : ''
+        };
+        // Limpa hash da URL para não persistir
+        try{ history.replaceState(null,'',window.location.pathname+window.location.search) }catch(e){}
+      }
+    }
+  }catch(e){console.log('[detectarErroURL]',e)}
+})();
+
+function descodificarErro(s){
+  return decodeURIComponent(String(s||'').replace(/\+/g,' '));
+}
 
 
 // Boot system
