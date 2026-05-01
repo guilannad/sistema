@@ -2119,29 +2119,42 @@ function parseQrNFCe(url){
       valorTotal: 0,
       dataEmissao: ''
     };
-    // Tenta extrair via parâmetro "p=" (formato comum)
+
+    // 1. Tenta extrair via parâmetro "p=" (formato comum em vários estados)
     var match = url.match(/[?&#]p=([^&]*)/i);
     if(match){
       var partes = decodeURIComponent(match[1]).split('|');
-      // Padrão: chave|versao|tpAmb|cIdToken|valorTotal|digestValue|csc
-      // Padrão alt: chave|versao|tpAmb|...|cDest|csc
+      // Padrão SP/MG/etc: chave|versao|tpAmb|cIdToken|valorTotal|digestValue|csc
       if(partes[0] && partes[0].length===44){
         resultado.chaveAcesso = partes[0];
       }
-      // Tenta encontrar valor (geralmente índice 4)
+      // Tenta encontrar valor monetário
       partes.forEach(function(p){
-        // valor monetário: número decimal com 1-15 dígitos antes do ponto e 2 depois
-        if(/^\d+\.\d{2}$/.test(p) && parseFloat(p)>0){
+        if(/^\d+\.\d{2}$/.test(p) && parseFloat(p)>0 && parseFloat(p)<100000){
           if(!resultado.valorTotal) resultado.valorTotal = parseFloat(p);
         }
       });
     }
-    // Se não pegou pelo p=, tenta extrair chave de 44 dígitos da URL inteira
+
+    // 2. Tenta parâmetros alternativos comuns: vNF, vTotal, valor
+    if(!resultado.valorTotal){
+      ['vNF','vTotal','vTot','valor','total'].forEach(function(par){
+        var rxParam = new RegExp('[?&#]'+par+'=([\\d.,]+)','i');
+        var m2 = url.match(rxParam);
+        if(m2){
+          var v = parseFloat(m2[1].replace(',','.'));
+          if(v>0 && v<100000 && !resultado.valorTotal) resultado.valorTotal = v;
+        }
+      });
+    }
+
+    // 3. Se não pegou pelo p=, tenta extrair chave de 44 dígitos da URL inteira
     if(!resultado.chaveAcesso){
       var chaveMatch = url.match(/(\d{44})/);
       if(chaveMatch) resultado.chaveAcesso = chaveMatch[1];
     }
-    // A chave de acesso tem informações estruturadas:
+
+    // 4. A chave de acesso tem informações estruturadas:
     // Pos  0-1: UF (código IBGE)
     // Pos  2-5: AAMM (ano e mês de emissão)
     // Pos  6-19: CNPJ do emitente (14 dígitos)
@@ -2150,11 +2163,10 @@ function parseQrNFCe(url){
       var ufCodigo = resultado.chaveAcesso.substring(0,2);
       var aamm = resultado.chaveAcesso.substring(2,6);
       var cnpj = resultado.chaveAcesso.substring(6,20);
-      // Mapeia código IBGE → UF
       var ufMap = {'12':'AC','27':'AL','13':'AM','16':'AP','29':'BA','23':'CE','53':'DF','32':'ES','52':'GO','21':'MA','31':'MG','50':'MS','51':'MT','15':'PA','25':'PB','26':'PE','22':'PI','41':'PR','33':'RJ','24':'RN','11':'RO','14':'RR','43':'RS','42':'SC','28':'SE','35':'SP','17':'TO'};
       resultado.ufEmitente = ufMap[ufCodigo] || '';
       resultado.cnpjEmitente = cnpj;
-      // Data emissão: AAMM → assume dia 01 (não dá pra precisar pelo QR)
+      // Data emissão: AAMM → dia 01 (precisão limitada pelo QR)
       var ano = '20'+aamm.substring(0,2);
       var mes = aamm.substring(2,4);
       resultado.dataEmissao = ano+'-'+mes+'-01';
@@ -2432,10 +2444,19 @@ function mNovaCompra(){
   if(c.chaveAcesso || c.cnpjEmitente || c.linkSefaz){
     html += '<div style="background:#E8F4FD;padding:10px;border-radius:8px;margin-bottom:10px;font-size:12px">';
     html += '<div style="font-weight:600;margin-bottom:4px">🧾 Dados fiscais (capturados do QR)</div>';
-    if(c.chaveAcesso) html += '<div>Chave de acesso: <code style="font-size:11px">'+esc(c.chaveAcesso)+'</code></div>';
-    if(c.cnpjEmitente) html += '<div>CNPJ emitente: '+mascararCpfCnpj(c.cnpjEmitente)+' / UF: '+esc(c.ufEmitente||'?')+'</div>';
-    if(c.linkSefaz) html += '<div><a href="'+esc(c.linkSefaz)+'" target="_blank" style="color:var(--accent)">🔗 Abrir consulta SEFAZ</a></div>';
-    html += '<button class="btn btn-sm btn-outline" onclick="limparDadosFiscais()" style="margin-top:6px">Limpar</button>';
+    if(c.chaveAcesso) html += '<div>Chave de acesso: <code style="font-size:11px;word-break:break-all">'+esc(c.chaveAcesso)+'</code></div>';
+    if(c.cnpjEmitente){
+      html += '<div>CNPJ emitente: '+mascararCpfCnpj(c.cnpjEmitente)+(c.ufEmitente?' / UF: '+esc(c.ufEmitente):'')+'</div>';
+      // Status do fornecedor
+      var fornecPorCnpj = (S.fornecedores||[]).find(function(f){return (f.cnpjCpf||'').replace(/\D/g,'')===c.cnpjEmitente});
+      if(fornecPorCnpj){
+        html += '<div style="margin-top:4px;color:#1E8449;font-weight:600">✓ Fornecedor reconhecido: '+esc(fornecPorCnpj.nome)+'</div>';
+      } else {
+        html += '<div style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span style="color:#B9770E">⚠ Fornecedor não cadastrado</span><button class="btn btn-sm btn-success" onclick="cadastrarFornecedorDoQR()">+ Cadastrar com este CNPJ</button></div>';
+      }
+    }
+    if(c.linkSefaz) html += '<div style="margin-top:4px"><a href="'+esc(c.linkSefaz)+'" target="_blank" style="color:var(--accent)">🔗 Abrir consulta SEFAZ (ver detalhes/itens)</a></div>';
+    html += '<button class="btn btn-sm btn-outline" onclick="limparDadosFiscais()" style="margin-top:6px">Limpar dados fiscais</button>';
     html += '</div>';
   }
 
@@ -2862,19 +2883,24 @@ function processarQRDetectado(texto){
   S.compraEdit.cnpjEmitente = parsed.cnpjEmitente;
   S.compraEdit.ufEmitente = parsed.ufEmitente;
   if(parsed.dataEmissao) S.compraEdit.dataPedido = parsed.dataEmissao;
+
   // Tenta achar fornecedor existente pelo CNPJ
+  var fornecReconhecido = null;
+  var fornecPendenteCadastro = null;
   if(parsed.cnpjEmitente){
-    var existente = (S.fornecedores||[]).find(function(f){
+    fornecReconhecido = (S.fornecedores||[]).find(function(f){
       return (f.cnpjCpf||'').replace(/\D/g,'') === parsed.cnpjEmitente;
     });
-    if(existente){
-      S.compraEdit.fornecedorId = existente.id;
-      toast('Fornecedor reconhecido: '+existente.nome,'success');
+    if(fornecReconhecido){
+      S.compraEdit.fornecedorId = fornecReconhecido.id;
     } else {
-      toast('CNPJ '+parsed.cnpjEmitente+' não cadastrado. Cadastre o fornecedor depois se quiser.','info');
+      // Guarda o CNPJ para usar no botão "cadastrar fornecedor"
+      fornecPendenteCadastro = parsed.cnpjEmitente;
     }
   }
-  if(parsed.valorTotal && !S.compraEditItens.length){
+
+  // Preenche valor (se conseguiu extrair)
+  if(parsed.valorTotal && !(S.compraEditItens||[]).length){
     // Cria 1 linha "Diversos" agrupada com o valor total
     S.compraEdit.modoItens = 'agrupado';
     S.compraEditItens = [{
@@ -2887,10 +2913,52 @@ function processarQRDetectado(texto){
       qtdRecebida: 0
     }];
   }
+
+  // Guarda dica para mostrar no modal
+  S._qrDica = {
+    fornecReconhecido: fornecReconhecido,
+    cnpjPendente: fornecPendenteCadastro,
+    valorCapturado: parsed.valorTotal
+  };
+
   S.modal = 'novaCompra';
   render();
-  toast('QR processado! Revise os dados e confirme.');
+
+  // Mensagem de feedback resumida
+  var msgs = [];
+  msgs.push('✓ QR processado.');
+  if(fornecReconhecido) msgs.push('Fornecedor: '+fornecReconhecido.nome);
+  else if(fornecPendenteCadastro) msgs.push('CNPJ '+mascararCpfCnpj(fornecPendenteCadastro)+' não está cadastrado.');
+  if(parsed.valorTotal) msgs.push('Valor R$'+parsed.valorTotal.toFixed(2).replace('.',','));
+  toast(msgs.join(' • '));
 }
+
+// Cadastra fornecedor com CNPJ pré-preenchido vindo do QR
+window.cadastrarFornecedorDoQR = function(){
+  if(!S._qrDica || !S._qrDica.cnpjPendente){
+    return openNovoFornecedor();
+  }
+  var cnpj = S._qrDica.cnpjPendente;
+  S.editFornecedor = null;
+  // Mantém referência para depois de salvar voltar pra compra
+  S._fornecedorVemDoQR = true;
+  S.modal = 'editFornecedor';
+  render();
+  // Pré-preenche o CNPJ depois do render
+  setTimeout(function(){
+    var inp = document.getElementById('fCnpj');
+    if(inp){
+      inp.value = mascararCpfCnpj(cnpj);
+      // Tenta colocar UF na observação se houver
+      var ufInp = document.getElementById('fEspecialidade');
+      if(ufInp && S.compraEdit && S.compraEdit.ufEmitente){
+        ufInp.placeholder = 'Ex: comércio em '+S.compraEdit.ufEmitente;
+      }
+    }
+    var nomeInp = document.getElementById('fNome');
+    if(nomeInp) nomeInp.focus();
+  }, 100);
+};
 
 function mLeitorQR(){
   return '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide" style="max-width:520px"><h3>📷 Ler QR Code do cupom</h3>'+
@@ -3067,6 +3135,14 @@ window.salvarFornecedor = async function(){
       S.fornecedores.sort(function(a,b){return (a.nome||'').localeCompare(b.nome||'','pt-BR',{sensitivity:'base'})});
       addHistDB('+ Fornecedor: '+nome);
       toast('Fornecedor cadastrado!');
+      // Se veio do QR (durante uma compra), volta para a compra com o fornecedor selecionado
+      if(S._fornecedorVemDoQR && S.compraEdit){
+        S.compraEdit.fornecedorId = f.id;
+        S._fornecedorVemDoQR = false;
+        S.modal = 'novaCompra';
+        render();
+        return;
+      }
     } else return toast('Falha ao criar fornecedor','error');
   }
   closeModal();
@@ -3870,7 +3946,16 @@ S.activeTab=t;S.search='';S.filterSecao='';S.filterTipo='';S.filterStatus='';S.f
 window.doLogout=async function(){addHistDB('Logout');_pararMonitorHorario();await authSignOut();S.currentUser=null;render()};
 window.doSearch=function(){var si=document.getElementById('searchInput');if(si)S.search=si.value;S.page=1;render()};
 window.setFilterEstoque=function(f){S.filterEstoque=f;S.page=1;render()};
-window.closeModal=function(){S.modal=null;S.editItem=null;S.editUser=null;S.editConsulente=null;S.confirmText='';S.confirmAction=null;S.flowType=null;S.flowPessoaId=null;render()};
+window.closeModal=function(){
+  // Se cancelou o cadastro de fornecedor que veio do QR, volta pra compra
+  if(S._fornecedorVemDoQR && S.modal==='editFornecedor' && S.compraEdit){
+    S._fornecedorVemDoQR = false;
+    S.modal = 'novaCompra';
+    render();
+    return;
+  }
+  S.modal=null;S.editItem=null;S.editUser=null;S.editConsulente=null;S.confirmText='';S.confirmAction=null;S.flowType=null;S.flowPessoaId=null;render()
+};
 
 window.openAddItem=function(){S.editItem=null;S.modal='addItem';render()};
 window.openEditItem=function(id){S.editItem=S.items.find(function(i){return i.id===id});S.modal='editItem';render()};
