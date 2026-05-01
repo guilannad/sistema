@@ -871,6 +871,125 @@ function consFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,nomeCompleto:r.nome_
 function vendaToDB(v){return {id:v.id||undefined,pessoa_id:v.pessoaId||null,data:v.data||today(),itens:v.itens||[],subtotal:v.subtotal||0,valor_frete:v.valorFrete||0,total_com_frete:v.totalComFrete||0,tipo_frete:v.tipoFrete||'',forma_pagamento:v.formaPagamento||'',status:v.status||'pedido_feito',codigo_rastreio:v.codigoRastreio||'',comprovante:v.comprovante||'',arquivado:v.arquivado||false}}
 function vendaFromDB(r){return {id:r.id,pessoaId:r.pessoa_id,data:r.data||'',itens:r.itens||[],subtotal:r.subtotal||0,valorFrete:r.valor_frete||0,totalComFrete:r.total_com_frete||0,tipoFrete:r.tipo_frete||'',formaPagamento:r.forma_pagamento||'',status:r.status||'pedido_feito',codigoRastreio:r.codigo_rastreio||'',comprovante:r.comprovante||'',arquivado:r.arquivado||false}}
 
+// ==================== MAPPERS DE COMPRAS ====================
+function fornecedorToDB(f){return {
+  id:f.id||undefined,
+  nome:f.nome||'',
+  tipo:f.tipo||'pessoa_juridica',
+  cnpj_cpf:f.cnpjCpf||'',
+  telefone:f.telefone||'',
+  email:f.email||'',
+  endereco:f.endereco||'',
+  especialidade:f.especialidade||'',
+  avaliacao:parseInt(f.avaliacao)||0,
+  ativo:f.ativo!==false,
+  observacoes:f.observacoes||''
+}}
+function fornecedorFromDB(r){return {
+  id:r.id,
+  nome:r.nome||'',
+  tipo:r.tipo||'pessoa_juridica',
+  cnpjCpf:r.cnpj_cpf||'',
+  telefone:r.telefone||'',
+  email:r.email||'',
+  endereco:r.endereco||'',
+  especialidade:r.especialidade||'',
+  avaliacao:parseInt(r.avaliacao)||0,
+  ativo:r.ativo!==false,
+  observacoes:r.observacoes||'',
+  criadoEm:r.criado_em||null,
+  criadoPor:r.criado_por||'',
+  atualizadoEm:r.atualizado_em||null,
+  atualizadoPor:r.atualizado_por||''
+}}
+
+function compraToDB(c){return {
+  id:c.id||undefined,
+  fornecedor_id:c.fornecedorId||null,
+  chave_acesso:c.chaveAcesso||'',
+  numero_documento:c.numeroDocumento||'',
+  cnpj_emitente:c.cnpjEmitente||'',
+  uf_emitente:c.ufEmitente||'',
+  link_sefaz:c.linkSefaz||'',
+  data_pedido:c.dataPedido||today(),
+  data_pagamento:c.dataPagamento||null,
+  data_recebimento:c.dataRecebimento||null,
+  subtotal:parseFloat(c.subtotal)||0,
+  valor_frete:parseFloat(c.valorFrete)||0,
+  valor_desconto:parseFloat(c.valorDesconto)||0,
+  total:parseFloat(c.total)||0,
+  forma_pagamento:c.formaPagamento||'',
+  codigo_rastreio:c.codigoRastreio||'',
+  status:c.status||'pedido_feito',
+  modo_itens:c.modoItens||'detalhado',
+  nota_fiscal_path:c.notaFiscalPath||'',
+  comprovante_pagamento_path:c.comprovantePagamentoPath||'',
+  observacoes:c.observacoes||'',
+  arquivado:c.arquivado||false
+}}
+function compraFromDB(r){return {
+  id:r.id,
+  fornecedorId:r.fornecedor_id||null,
+  chaveAcesso:r.chave_acesso||'',
+  numeroDocumento:r.numero_documento||'',
+  cnpjEmitente:r.cnpj_emitente||'',
+  ufEmitente:r.uf_emitente||'',
+  linkSefaz:r.link_sefaz||'',
+  dataPedido:r.data_pedido||'',
+  dataPagamento:r.data_pagamento||null,
+  dataRecebimento:r.data_recebimento||null,
+  subtotal:parseFloat(r.subtotal)||0,
+  valorFrete:parseFloat(r.valor_frete)||0,
+  valorDesconto:parseFloat(r.valor_desconto)||0,
+  total:parseFloat(r.total)||0,
+  formaPagamento:r.forma_pagamento||'',
+  codigoRastreio:r.codigo_rastreio||'',
+  status:r.status||'pedido_feito',
+  modoItens:r.modo_itens||'detalhado',
+  notaFiscalPath:r.nota_fiscal_path||'',
+  comprovantePagamentoPath:r.comprovante_pagamento_path||'',
+  observacoes:r.observacoes||'',
+  arquivado:r.arquivado||false,
+  criadoEm:r.criado_em||null,
+  criadoPor:r.criado_por||'',
+  atualizadoEm:r.atualizado_em||null,
+  atualizadoPor:r.atualizado_por||''
+}}
+
+function compraItemToDB(ci){return {
+  id:ci.id||undefined,
+  compra_id:ci.compraId,
+  item_id:ci.itemId||null,
+  descricao:ci.descricao||'',
+  quantidade:parseFloat(ci.quantidade)||1,
+  qtd_recebida:parseFloat(ci.qtdRecebida)||0,
+  unidade_medida:ci.unidadeMedida||'un',
+  valor_unitario:parseFloat(ci.valorUnitario)||0,
+  valor_total:parseFloat(ci.valorTotal)||0,
+  observacao:ci.observacao||''
+}}
+function compraItemFromDB(r){return {
+  id:r.id,
+  compraId:r.compra_id,
+  itemId:r.item_id||null,
+  descricao:r.descricao||'',
+  quantidade:parseFloat(r.quantidade)||0,
+  qtdRecebida:parseFloat(r.qtd_recebida)||0,
+  unidadeMedida:r.unidade_medida||'un',
+  valorUnitario:parseFloat(r.valor_unitario)||0,
+  valorTotal:parseFloat(r.valor_total)||0,
+  observacao:r.observacao||''
+}}
+
+// Status do kanban de Compras
+var STATUS_COMPRA=[
+  {key:'pedido_feito',  label:'Pedido Feito',  color:'#3498DB'},
+  {key:'pago',          label:'Pago',          color:'#9B59B6'},
+  {key:'em_transito',   label:'Em Trânsito',   color:'#F39C12'},
+  {key:'recebido',      label:'Recebido',      color:'#27AE60'},
+  {key:'cancelado',     label:'Cancelado',     color:'#C0392B'}
+];
+
 // Mappers items (estoque) com auditoria
 function itemToDB(i){return {id:i.id||undefined,nome:i.nome||'',tipo:i.tipo||'',secao:i.secao||'',localizacao:i.localizacao||'',observacoes:i.observacoes||'',estoque_atual:(i.estoqueAtual===undefined||i.estoqueAtual==='')?0:parseFloat(i.estoqueAtual)||0,unidade_medida:i.unidadeMedida||'un',estoque_minimo:(i.estoqueMinimo===undefined||i.estoqueMinimo==='')?0:parseFloat(i.estoqueMinimo)||0}}
 function itemFromDB(r){return {id:r.id,nome:r.nome||'',tipo:r.tipo||'',secao:r.secao||'',localizacao:r.localizacao||'',observacoes:r.observacoes||'',estoqueAtual:r.estoque_atual!=null?parseFloat(r.estoque_atual):0,unidadeMedida:r.unidade_medida||'un',estoqueMinimo:r.estoque_minimo!=null?parseFloat(r.estoque_minimo):0,ultimoCustoUnitario:r.ultimo_custo_unitario!=null?parseFloat(r.ultimo_custo_unitario):null,dataUltimaCompra:r.data_ultima_compra||null,criadoEm:r.criado_em||null,criadoPor:r.criado_por||'',atualizadoEm:r.atualizado_em||null,atualizadoPor:r.atualizado_por||''}}
@@ -1186,6 +1305,40 @@ try{
     }catch(e){if(!quiet) console.warn('solicitacoes não carregou:',e.message)}
   } else {
     S.solicitacoes = [];
+  }
+
+  // ================= FORNECEDORES (admin/babalawo/secretario) =================
+  if(perfil === 'admin' || perfil === 'babalawo' || perfil === 'secretario'){
+    try{
+      const rf = await sbGet('fornecedores','?order=nome.asc&limit=1000');
+      if(rf.ok){
+        S.fornecedores = (await rf.json()).map(fornecedorFromDB);
+        if(!quiet) console.log('[LOAD] fornecedores', S.fornecedores.length);
+      }
+    }catch(e){if(!quiet) console.warn('fornecedores não carregou:',e.message)}
+  } else {
+    S.fornecedores = [];
+  }
+
+  // ================= COMPRAS (admin/babalawo/secretario) =================
+  if(perfil === 'admin' || perfil === 'babalawo' || perfil === 'secretario'){
+    try{
+      const rc = await sbGet('compras','?order=data_pedido.desc&limit=2000');
+      if(rc.ok){
+        S.compras = (await rc.json()).map(compraFromDB);
+        if(!quiet) console.log('[LOAD] compras', S.compras.length);
+      }
+    }catch(e){if(!quiet) console.warn('compras não carregou:',e.message)}
+    try{
+      const rci = await sbGet('compra_itens','?order=id.asc&limit=10000');
+      if(rci.ok){
+        S.compraItens = (await rci.json()).map(compraItemFromDB);
+        if(!quiet) console.log('[LOAD] compra_itens', S.compraItens.length);
+      }
+    }catch(e){if(!quiet) console.warn('compra_itens não carregou:',e.message)}
+  } else {
+    S.compras = [];
+    S.compraItens = [];
   }
 
   _dbReady = true;
@@ -1539,6 +1692,7 @@ else if(t==='rel_vendas')h+=renderRelVendas();
 else if(t==='prescricao_page')h+=renderPrescricaoPage();
 else if(t==='dashboard_vendas')h+=renderDashboardVendas();
 else if(t==='crediario')h+=renderCrediario();
+else if(t==='compras')h+=renderCompras();
 else if(t==='biblioteca')h+=renderBiblioteca();
 if(S.modal)h+=renderModal();
 if(S.toast)h+='<div class="toast toast-'+S.toast.type+'">'+esc(S.toast.msg)+'</div>';
@@ -1750,6 +1904,7 @@ if(hasRole(['admin','editor']))tabs.push({key:'gerenciar',label:'Estoque'});
 if(hasRole(['admin','secretario','editor','babalawo','assistente']))tabs.push({key:'clientes',label:'Clientes'});
 if(hasRole(['admin','secretario','babalawo','assistente']))tabs.push({key:'dashboard_vendas',label:'Vendas'});
 if(hasRole(['admin','secretario','babalawo']))tabs.push({key:'crediario',label:'Crediário'});
+if(hasRole(['admin','secretario','babalawo']))tabs.push({key:'compras',label:'\\uD83D\\uDED2 Compras'});
 if(hasRole(['admin']))tabs.push({key:'rel_vendas',label:'Relatórios'});
 if(hasRole(['admin']))tabs.push({key:'usuarios',label:'Usuários'});
 tabs.push({key:'biblioteca',label:'\uD83D\uDCDA Biblioteca'});
@@ -1916,6 +2071,306 @@ if(cri){return '<div style="font-size:11px;line-height:1.3"><div style="color:va
 return '<span style="color:var(--text3);font-size:11px">—</span>'}
 
 function renderBibliotecaTable(pg,total){var pp=Math.ceil(total/S.perPage);var canEdit=hasRole(['admin','babalawo','assistente','editor']);var isEditor=S.currentUser&&S.currentUser.perfil==='editor';if(!pg.length)return '<div class="table-wrap"><div class="empty-state">Nenhum livro encontrado</div></div>';return '<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Nome</th><th>Autor</th><th>Tipo</th><th>Gênero</th><th>Seção</th><th>Local</th><th>Cadastrado</th>'+(canEdit?'<th>Ações</th>':'')+'</tr></thead><tbody>'+pg.map(function(l){var pendente=hasPedidoPendente('livro',l.id);return '<tr'+(pendente?' style="opacity:.6"':'')+'><td style="font-weight:500">'+esc(l.nome)+(pendente?' <span style="background:#FEF5E7;color:#B9770E;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600">⏳ aguardando exclusão</span>':'')+'</td><td>'+esc(l.autor)+'</td><td><span class="tipo-badge" style="background:var(--info-bg);color:var(--info)">'+esc(l.tipo)+'</span></td><td style="font-size:12px">'+esc(l.genero)+'</td><td style="font-size:12px">'+esc(l.secao)+'</td><td style="font-size:12px">'+esc(l.localizacao)+'</td><td>'+auditCell(l)+'</td>'+(canEdit?'<td><div class="actions-cell"><button class="edit-btn btn-sm" onclick="openEditLivro('+l.id+')">Editar</button>'+(pendente?'':(isEditor?'<button class="del-btn btn-sm" style="background:#F39C12;color:#fff;border-color:#F39C12" onclick="solicitarExclusao(\'livro\','+l.id+')" title="Solicitar exclusão ao admin">⏳</button>':'<button class="del-btn btn-sm" onclick="confirmDelLivro('+l.id+')">X</button>'))+'</div></td>':'')+'</tr>'}).join('')+'</tbody></table></div>'+(pp>1?renderPag(pp):'')+'</div>'}
+
+// ==================== ÁREA DE COMPRAS ====================
+function getFornecedor(id){return (S.fornecedores||[]).find(function(f){return f.id===id})}
+function getItensDaCompra(compraId){return (S.compraItens||[]).filter(function(ci){return ci.compraId===compraId})}
+
+// Sub-aba dentro de Compras: 'kanban' | 'fornecedores' | 'arquivadas'
+function renderCompras(){
+  var sub = S._compraSubAba || 'kanban';
+  var canEdit = hasRole(['admin','babalawo','secretario']);
+  var navTabs = '<div class="search-section" style="margin-bottom:16px"><div style="display:flex;gap:8px;flex-wrap:wrap">'+
+    '<button class="btn '+(sub==='kanban'?'btn-primary':'btn-outline')+'" onclick="setCompraSubAba(\'kanban\')">📦 Kanban</button>'+
+    '<button class="btn '+(sub==='fornecedores'?'btn-primary':'btn-outline')+'" onclick="setCompraSubAba(\'fornecedores\')">🏪 Fornecedores</button>'+
+    '<button class="btn '+(sub==='arquivadas'?'btn-primary':'btn-outline')+'" onclick="setCompraSubAba(\'arquivadas\')">📁 Arquivadas</button>'+
+    '</div></div>';
+  if(sub==='fornecedores')return navTabs+renderFornecedores();
+  if(sub==='arquivadas')return navTabs+renderComprasArquivadas();
+  return navTabs+renderComprasKanban();
+}
+
+window.setCompraSubAba=function(s){S._compraSubAba=s;render()};
+
+function renderComprasKanban(){
+  var todas = (S.compras||[]).filter(function(c){return !c.arquivado});
+  // Agrupa por status
+  var bv = {};
+  STATUS_COMPRA.forEach(function(s){bv[s.key]=[]});
+  todas.forEach(function(c){if(bv[c.status])bv[c.status].push(c)});
+  // Ordena cada coluna por data desc
+  STATUS_COMPRA.forEach(function(s){bv[s.key].sort(function(a,b){return (b.dataPedido||'').localeCompare(a.dataPedido||'')})});
+  var totalAtivas = todas.length;
+  var qtdArquivadas = (S.compras||[]).filter(function(c){return c.arquivado}).length;
+  var canEdit = hasRole(['admin','babalawo','secretario']);
+
+  var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">'+
+    '<div style="font-size:13px;color:var(--text2)">'+totalAtivas+' compra(s) ativa(s)'+(qtdArquivadas>0?' • '+qtdArquivadas+' arquivada(s)':'')+'</div>'+
+    (canEdit?'<button class="btn btn-primary" onclick="openNovaCompra()">+ Nova Compra</button>':'')+
+    '</div>';
+
+  // Cards de resumo
+  h += '<div class="report-cards">';
+  STATUS_COMPRA.forEach(function(s){
+    h += '<div class="report-card" style="border-left-color:'+s.color+'"><div class="rc-label">'+s.label+'</div><div class="rc-value">'+bv[s.key].length+'</div></div>';
+  });
+  h += '</div>';
+
+  // Kanban
+  h += '<div class="kanban-grid">';
+  STATUS_COMPRA.forEach(function(s){
+    h += '<div class="kanban-col"><div class="kanban-header">'+esc(s.label)+'<span class="kanban-count">'+bv[s.key].length+'</span></div>';
+    bv[s.key].forEach(function(c){
+      h += renderCompraCard(c, s);
+    });
+    h += '</div>';
+  });
+  h += '</div>';
+  return h;
+}
+
+function renderCompraCard(c, status){
+  var f = getFornecedor(c.fornecedorId);
+  var fornecNome = f ? f.nome : (c.cnpjEmitente ? '🧾 '+c.cnpjEmitente : 'Sem fornecedor');
+  var itens = getItensDaCompra(c.id);
+  var canEdit = hasRole(['admin','babalawo','secretario']);
+  var idxStatus = STATUS_COMPRA.findIndex(function(x){return x.key===status.key});
+
+  var h = '<div class="kanban-card" style="border-left-color:'+status.color+'">'+
+    '<h4>#'+c.id+' '+esc(fornecNome)+'</h4>'+
+    '<div class="kc-sub">'+fmtDate(c.dataPedido)+' • R$'+(c.total||0).toFixed(2).replace('.',',')+(c.modoItens==='agrupado'?' • <em>agrupado</em>':'')+'</div>';
+
+  // Resumo de itens (até 3 primeiros)
+  if(itens.length){
+    var resumo = itens.slice(0,3).map(function(ci){
+      var nome = ci.itemId ? (function(){var it=S.items.find(function(i){return i.id===ci.itemId});return it?it.nome:ci.descricao}()) : ci.descricao;
+      return '<div style="font-size:11px;color:var(--text2)">'+ci.quantidade+(ci.unidadeMedida?' '+ci.unidadeMedida:'')+' • '+esc(nome||'?')+'</div>';
+    }).join('');
+    h += resumo;
+    if(itens.length>3) h += '<div style="font-size:11px;color:var(--text3)">+ '+(itens.length-3)+' iten(s)</div>';
+  } else {
+    h += '<div style="font-size:11px;color:var(--text3)"><em>Sem itens cadastrados</em></div>';
+  }
+
+  // Anexos
+  if(c.notaFiscalPath || c.linkSefaz){
+    h += '<div style="font-size:11px;margin-top:4px;color:var(--info)">';
+    if(c.linkSefaz) h += '🔗 NFC-e ';
+    if(c.notaFiscalPath) h += '📎 Anexo';
+    h += '</div>';
+  }
+
+  // Ações
+  if(canEdit){
+    h += '<div class="kc-actions">';
+    if(idxStatus>0 && status.key!=='cancelado') h += '<button class="btn btn-sm btn-outline" onclick="moverCompra('+c.id+',-1)" title="Voltar status">◀</button>';
+    if(idxStatus<3 && status.key!=='cancelado') h += '<button class="btn btn-sm btn-success" onclick="moverCompra('+c.id+',1)">Avançar</button>';
+    if(status.key==='em_transito') h += '<button class="btn btn-sm btn-info" onclick="abrirRecebimento('+c.id+')">📦 Receber</button>';
+    h += '<button class="btn btn-sm btn-outline" onclick="abrirCompra('+c.id+')">Ver</button>';
+    if(status.key==='recebido' || status.key==='cancelado') h += '<button class="btn btn-sm" style="background:#7F8C8D;color:#fff" onclick="arquivarCompra('+c.id+')" title="Tirar do kanban">📦 Finalizar</button>';
+    if(hasRole(['admin'])) h += '<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="excluirCompra('+c.id+')">×</button>';
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function renderComprasArquivadas(){
+  var arq = (S.compras||[]).filter(function(c){return c.arquivado}).sort(function(a,b){return (b.dataPedido||'').localeCompare(a.dataPedido||'')});
+  if(!arq.length) return '<div class="empty-state">Nenhuma compra arquivada.</div>';
+  var canEdit = hasRole(['admin','babalawo','secretario']);
+  var h = '<div style="font-size:13px;color:var(--text2);margin-bottom:12px">'+arq.length+' compra(s) arquivada(s)</div>';
+  h += '<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>#</th><th>Data</th><th>Fornecedor</th><th>Status</th><th>Total</th><th>Itens</th>'+(canEdit?'<th>Ações</th>':'')+'</tr></thead><tbody>';
+  arq.forEach(function(c){
+    var f = getFornecedor(c.fornecedorId);
+    var status = STATUS_COMPRA.find(function(s){return s.key===c.status})||{label:c.status,color:'#999'};
+    var itens = getItensDaCompra(c.id);
+    h += '<tr style="opacity:.85"><td>#'+c.id+'</td><td>'+fmtDate(c.dataPedido)+'</td><td>'+esc(f?f.nome:'(sem fornecedor)')+'</td><td><span style="background:'+status.color+';color:#fff;padding:2px 8px;border-radius:4px;font-size:11px">'+esc(status.label)+'</span></td><td>R$'+(c.total||0).toFixed(2).replace('.',',')+'</td><td>'+itens.length+'</td>'+(canEdit?'<td><button class="btn btn-sm btn-info" onclick="desarquivarCompra('+c.id+')" title="Voltar ao kanban">↺</button> <button class="btn btn-sm btn-outline" onclick="abrirCompra('+c.id+')">Ver</button></td>':'')+'</tr>';
+  });
+  h += '</tbody></table></div></div>';
+  return h;
+}
+
+// ==================== AÇÕES DE COMPRAS ====================
+window.moverCompra = async function(id, delta){
+  var c = (S.compras||[]).find(function(x){return x.id===id}); if(!c) return;
+  var idx = STATUS_COMPRA.findIndex(function(s){return s.key===c.status});
+  var novo = STATUS_COMPRA[idx+delta];
+  if(!novo) return;
+  if(novo.key==='cancelado'){
+    if(!confirm('Cancelar esta compra?\n\nEla será movida para a coluna Cancelado mas pode ser restaurada.')) return;
+  }
+  c.status = novo.key;
+  // Se mudou para "pago", grava data_pagamento
+  if(novo.key==='pago' && !c.dataPagamento) c.dataPagamento = today();
+  // Se mudou para "recebido", grava data_recebimento e abre modal de conferência
+  if(novo.key==='recebido' && !c.dataRecebimento) c.dataRecebimento = today();
+  var ok = await saveRecord('compras', c.id, _stampUpdate(compraToDB(c)));
+  if(ok){
+    addHistDB('Compra #'+id+' → '+novo.label);
+    toast('Status atualizado: '+novo.label);
+  } else toast('Falha ao mover','error');
+  render();
+};
+
+window.arquivarCompra = async function(id){
+  var c = (S.compras||[]).find(function(x){return x.id===id}); if(!c) return;
+  if(!confirm('Arquivar a compra #'+id+'?\n\nElea sai do kanban mas continua nos relatórios.')) return;
+  c.arquivado = true;
+  var ok = await saveRecord('compras', c.id, _stampUpdate(compraToDB(c)));
+  if(ok){addHistDB('Compra #'+id+' arquivada');toast('Compra arquivada')}
+  else{c.arquivado=false;toast('Falha ao arquivar','error')}
+  render();
+};
+
+window.desarquivarCompra = async function(id){
+  var c = (S.compras||[]).find(function(x){return x.id===id}); if(!c) return;
+  c.arquivado = false;
+  var ok = await saveRecord('compras', c.id, _stampUpdate(compraToDB(c)));
+  if(ok){addHistDB('Compra #'+id+' desarquivada');toast('Compra reaberta')}
+  else{c.arquivado=true;toast('Falha ao desarquivar','error')}
+  render();
+};
+
+window.excluirCompra = async function(id){
+  var c = (S.compras||[]).find(function(x){return x.id===id}); if(!c) return;
+  var f = getFornecedor(c.fornecedorId);
+  if(!confirm('EXCLUIR DEFINITIVAMENTE a compra #'+id+'?\n\nFornecedor: '+(f?f.nome:'(sem)')+'\nTotal: R$'+(c.total||0).toFixed(2)+'\n\nTodos os itens vinculados também serão removidos. Esta ação é irreversível.')) return;
+  var ok = await deleteRecord('compras', id);
+  if(ok){
+    S.compras = S.compras.filter(function(x){return x.id!==id});
+    S.compraItens = S.compraItens.filter(function(ci){return ci.compraId!==id});
+    addHistDB('- Compra #'+id+' excluída');
+    toast('Compra excluída');
+  } else toast('Falha ao excluir','error');
+  render();
+};
+
+// Stubs (serão implementados na Mensagem 3)
+window.openNovaCompra = function(){toast('Cadastro de compra — em breve (Mensagem 3)','info')};
+window.abrirCompra = function(id){toast('Detalhes da compra — em breve (Mensagem 3)','info')};
+window.abrirRecebimento = function(id){toast('Conferência de recebimento — em breve (Mensagem 3)','info')};
+
+// ==================== FORNECEDORES ====================
+function renderFornecedores(){
+  var fs = (S.fornecedores||[]).slice();
+  // Filtro por busca
+  var q = (S._buscaFornec||'').toLowerCase().trim();
+  if(q) fs = fs.filter(function(f){return (f.nome+' '+f.especialidade+' '+f.cnpjCpf).toLowerCase().indexOf(q)>=0});
+  var canEdit = hasRole(['admin','babalawo','secretario']);
+  var ativos = fs.filter(function(f){return f.ativo}).length;
+
+  var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">'+
+    '<div style="font-size:13px;color:var(--text2)">'+ativos+' ativo(s) • '+fs.length+' total</div>'+
+    (canEdit?'<button class="btn btn-primary" onclick="openNovoFornecedor()">+ Novo Fornecedor</button>':'')+
+    '</div>';
+  h += '<div class="search-section"><div class="search-bar"><input class="search-input" placeholder="Buscar por nome, CNPJ ou especialidade..." value="'+esc(q)+'" id="searchFornec" oninput="S._buscaFornec=this.value;render()"></div></div>';
+
+  if(!fs.length){h+='<div class="empty-state">Nenhum fornecedor cadastrado.</div>';return h}
+
+  h += '<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Nome</th><th>Tipo</th><th>CNPJ/CPF</th><th>Contato</th><th>Especialidade</th><th>Aval.</th><th>Status</th>'+(canEdit?'<th>Ações</th>':'')+'</tr></thead><tbody>';
+  fs.forEach(function(f){
+    var tipoLabel = {pessoa_fisica:'PF',pessoa_juridica:'PJ',marketplace:'🛒 Marketplace',informal:'Informal'}[f.tipo]||f.tipo;
+    var aval = f.avaliacao>0 ? '⭐'.repeat(f.avaliacao) : '<span style="color:var(--text3)">—</span>';
+    h += '<tr'+(f.ativo?'':' style="opacity:.5"')+'>'+
+      '<td><strong>'+esc(f.nome)+'</strong></td>'+
+      '<td style="font-size:12px">'+esc(tipoLabel)+'</td>'+
+      '<td style="font-size:12px">'+esc(f.cnpjCpf||'—')+'</td>'+
+      '<td style="font-size:12px">'+esc(f.telefone||f.email||'—')+'</td>'+
+      '<td style="font-size:12px">'+esc(f.especialidade||'—')+'</td>'+
+      '<td>'+aval+'</td>'+
+      '<td>'+(f.ativo?'<span style="background:#27AE60;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px">Ativo</span>':'<span style="background:#7F8C8D;color:#fff;padding:2px 8px;border-radius:4px;font-size:11px">Inativo</span>')+'</td>'+
+      (canEdit?'<td><div class="actions-cell"><button class="edit-btn btn-sm" onclick="openEditFornecedor('+f.id+')">Editar</button>'+(hasRole(['admin'])?'<button class="del-btn btn-sm" onclick="excluirFornecedor('+f.id+')">×</button>':'')+'</div></td>':'')+
+      '</tr>';
+  });
+  h += '</tbody></table></div></div>';
+  return h;
+}
+
+window.openNovoFornecedor = function(){S.editFornecedor=null;S.modal='editFornecedor';render()};
+window.openEditFornecedor = function(id){S.editFornecedor=(S.fornecedores||[]).find(function(f){return f.id===id});S.modal='editFornecedor';render()};
+
+window.salvarFornecedor = async function(){
+  var nome = document.getElementById('fNome').value.trim();
+  if(!nome || nome.length<2) return toast('Informe o nome do fornecedor','error');
+  var d = {
+    nome: nome,
+    tipo: document.getElementById('fTipo').value,
+    cnpjCpf: document.getElementById('fCnpj').value.trim(),
+    telefone: document.getElementById('fTelefone').value.trim(),
+    email: document.getElementById('fEmail').value.trim(),
+    endereco: document.getElementById('fEndereco').value.trim(),
+    especialidade: document.getElementById('fEspecialidade').value.trim(),
+    avaliacao: parseInt(document.getElementById('fAvaliacao').value)||0,
+    ativo: document.getElementById('fAtivo').checked,
+    observacoes: document.getElementById('fObs').value.trim()
+  };
+  if(S.editFornecedor){
+    var dbPayload = _stampUpdate(fornecedorToDB(d));
+    var ok = await saveRecord('fornecedores', S.editFornecedor.id, dbPayload);
+    if(ok){
+      Object.assign(S.editFornecedor, d, {atualizadoEm:dbPayload.atualizado_em, atualizadoPor:dbPayload.atualizado_por});
+      addHistDB('Fornecedor editado: '+nome);
+      toast('Fornecedor atualizado!');
+    } else return toast('Falha ao salvar','error');
+  } else {
+    var dbNew = _stampInsert(fornecedorToDB(d));
+    var inserted = await insertRecord('fornecedores', dbNew);
+    if(inserted){
+      var f = fornecedorFromDB(inserted);
+      S.fornecedores = S.fornecedores || [];
+      S.fornecedores.push(f);
+      // Reordena por nome
+      S.fornecedores.sort(function(a,b){return (a.nome||'').localeCompare(b.nome||'','pt-BR',{sensitivity:'base'})});
+      addHistDB('+ Fornecedor: '+nome);
+      toast('Fornecedor cadastrado!');
+    } else return toast('Falha ao criar fornecedor','error');
+  }
+  closeModal();
+};
+
+window.excluirFornecedor = async function(id){
+  var f = (S.fornecedores||[]).find(function(x){return x.id===id}); if(!f) return;
+  // Verifica se há compras vinculadas
+  var temCompras = (S.compras||[]).some(function(c){return c.fornecedorId===id});
+  if(temCompras){
+    if(!confirm('Há compras vinculadas a "'+f.nome+'".\n\nSe excluir, as compras ficarão sem fornecedor (mas serão preservadas).\nAlternativa: marque como Inativo (Editar → desmarcar Ativo).\n\nExcluir mesmo assim?')) return;
+  } else {
+    if(!confirm('Excluir o fornecedor "'+f.nome+'"?\n\nEsta ação é irreversível.')) return;
+  }
+  var ok = await deleteRecord('fornecedores', id);
+  if(ok){
+    S.fornecedores = S.fornecedores.filter(function(x){return x.id!==id});
+    addHistDB('- Fornecedor excluído: '+f.nome);
+    toast('Fornecedor excluído');
+  } else toast('Falha ao excluir','error');
+  render();
+};
+
+// Modal de Fornecedor
+function mEditFornecedor(){
+  var f = S.editFornecedor;
+  var titulo = f ? 'Editar Fornecedor' : 'Novo Fornecedor';
+  return '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide"><h3>'+titulo+'</h3>'+
+    '<div class="form-group"><label>Nome *</label><input id="fNome" value="'+esc(f?f.nome:'')+'" placeholder="Nome do fornecedor ou loja"></div>'+
+    '<div class="form-group-row" style="display:flex;gap:8px"><div class="form-group" style="flex:1"><label>Tipo</label><select id="fTipo">'+
+      ['pessoa_juridica','pessoa_fisica','marketplace','informal'].map(function(t){
+        var lbl={pessoa_juridica:'PJ (Empresa)',pessoa_fisica:'PF (Pessoa Física)',marketplace:'Marketplace (Mercado Livre, Shopee...)',informal:'Informal (sem nota)'}[t];
+        return '<option value="'+t+'"'+(f&&f.tipo===t?' selected':'')+'>'+lbl+'</option>';
+      }).join('')+
+    '</select></div>'+
+    '<div class="form-group" style="flex:1"><label>CNPJ / CPF</label><input id="fCnpj" value="'+esc(f?f.cnpjCpf:'')+'" placeholder="00.000.000/0000-00"></div></div>'+
+    '<div class="form-group-row" style="display:flex;gap:8px"><div class="form-group" style="flex:1"><label>Telefone / WhatsApp</label><input id="fTelefone" value="'+esc(f?f.telefone:'')+'" placeholder="(11) 99999-9999"></div>'+
+    '<div class="form-group" style="flex:1"><label>Email</label><input id="fEmail" type="email" value="'+esc(f?f.email:'')+'" placeholder="contato@fornecedor.com"></div></div>'+
+    '<div class="form-group"><label>Endereço</label><input id="fEndereco" value="'+esc(f?f.endereco:'')+'" placeholder="Rua, número, cidade..."></div>'+
+    '<div class="form-group"><label>Especialidade</label><input id="fEspecialidade" value="'+esc(f?f.especialidade:'')+'" placeholder="Ex: ervas, louças, atacadão de itens religiosos"></div>'+
+    '<div class="form-group-row" style="display:flex;gap:8px"><div class="form-group" style="flex:1"><label>Avaliação (1-5 estrelas)</label><select id="fAvaliacao">'+
+      [0,1,2,3,4,5].map(function(n){return '<option value="'+n+'"'+(f&&f.avaliacao===n?' selected':'')+'>'+(n===0?'Sem avaliação':'⭐'.repeat(n))+'</option>'}).join('')+
+    '</select></div>'+
+    '<div class="form-group" style="flex:1;display:flex;align-items:flex-end"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="fAtivo" '+(!f||f.ativo?'checked':'')+'> Ativo</label></div></div>'+
+    '<div class="form-group"><label>Observações</label><textarea id="fObs" rows="2" placeholder="Anotações sobre prazos, contato, qualidade...">'+esc(f?f.observacoes:'')+'</textarea></div>'+
+    '<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="salvarFornecedor()">Salvar</button></div></div></div>';
+}
 
 function renderBiblioteca(){
 var fi=getFilteredLivros(),pg=paginate(fi);
@@ -2316,6 +2771,7 @@ if(m==='flowRitual')return mFlowRitual();
 if(m==='gestaoItens')return mGestaoItens();
 if(m==='addCiclo')return mAddCiclo();if(m==='addInter'||m==='editInter')return mInter();
 if(m==='rastreio')return mRastreio();if(m==='definirFrete')return mDefinirFrete();if(m==='aprovarExclusao')return mAprovarExclusao();if(m==='confirmConsulta')return mConfirmConsulta();if(m==='changeConsPag')return mChangeConsPag();
+if(m==='editFornecedor')return mEditFornecedor();
 if(m==='addCrediario')return mAddCrediario();if(m==='pagCrediario')return mPagCrediario();
 if(m==='addLivro'||m==='editLivro')return mLivro();
 return ''}
@@ -2616,7 +3072,7 @@ if(S.currentUser&&S.currentUser.perfil==='editor'){
 if(['gerenciar','biblioteca'].indexOf(t)<0){toast('Acesso restrito','error');return}}
 else if(S.currentUser&&(S.currentUser.perfil==='viewer'||S.currentUser.perfil==='visualizador')){
 if(['busca','gerenciar','biblioteca'].indexOf(t)<0){toast('Acesso restrito','error');return}}
-S.activeTab=t;S.search='';S.filterSecao='';S.filterTipo='';S.filterStatus='';S.filterGenero='';S.filterTipoLivro='';S.filterSecaoLivro='';S.filterEstoque='';S.page=1;render()};
+S.activeTab=t;S.search='';S.filterSecao='';S.filterTipo='';S.filterStatus='';S.filterGenero='';S.filterTipoLivro='';S.filterSecaoLivro='';S.filterEstoque='';S._compraSubAba='kanban';S._buscaFornec='';S.page=1;render()};
 window.doLogout=async function(){addHistDB('Logout');_pararMonitorHorario();await authSignOut();S.currentUser=null;render()};
 window.doSearch=function(){var si=document.getElementById('searchInput');if(si)S.search=si.value;S.page=1;render()};
 window.setFilterEstoque=function(f){S.filterEstoque=f;S.page=1;render()};
