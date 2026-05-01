@@ -1646,7 +1646,8 @@ if(user){
       if(!liberado){
         S._horarioBloqueio={username:user.username};
         addHistDB('Login bloqueado por horário: '+user.username);
-        try{await authSignOut()}catch(e){}
+        // Mantém sessão Supabase ativa para permitir solicitação de acesso emergencial.
+        // O signOut só acontece se o usuário clicar "Voltar ao login" ou cancelar.
         render();
         return;
       }
@@ -3310,7 +3311,7 @@ if (_sb) {
             var lib=await temLiberacaoEmergencial(restoredUser.username);
             if(!lib){
               S._horarioBloqueio={username:restoredUser.username};
-              try{await authSignOut()}catch(e){}
+              // Mantém sessão Supabase ativa para permitir solicitação de acesso emergencial.
               console.log('[AUTH] Sessão restaurada, mas fora do horário permitido');
               return;
             }
