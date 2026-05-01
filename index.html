@@ -6,6 +6,7 @@
 <title>Ilé Ifagbemi Brasil — Sistema de Gestão v32</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#F7F5F0;--bg2:#EDEAE3;--bg3:#fff;--text:#2C2A25;--text2:#6B6860;--text3:#9E9B93;--accent:#8B6914;--accent2:#B8860B;--accent-bg:#FDF6E3;--accent-light:#F5ECD4;--danger:#C0392B;--danger-bg:#FDEDEC;--success:#27AE60;--success-bg:#E8F8F0;--info:#2980B9;--info-bg:#EBF5FB;--warning:#F39C12;--warning-bg:#FEF9E7;--purple:#8E44AD;--purple-bg:#F4ECF7;--border:#D4D0C8;--border2:#E8E4DC;--radius:10px;--radius-lg:14px;--shadow:0 2px 12px rgba(44,42,37,0.08);--shadow-lg:0 8px 32px rgba(44,42,37,0.12)}
@@ -2076,6 +2077,92 @@ function renderBibliotecaTable(pg,total){var pp=Math.ceil(total/S.perPage);var c
 function getFornecedor(id){return (S.fornecedores||[]).find(function(f){return f.id===id})}
 function getItensDaCompra(compraId){return (S.compraItens||[]).filter(function(ci){return ci.compraId===compraId})}
 
+// ==================== STORAGE: UPLOAD/DOWNLOAD DE ANEXOS ====================
+async function uploadAnexoCompra(file, prefixo){
+  // prefixo ex: 'nota' ou 'comprovante'
+  if(!file) return null;
+  if(!_sb) return null;
+  var ext = (file.name||'').split('.').pop().toLowerCase();
+  var nome = (prefixo||'anexo')+'_'+Date.now()+'_'+Math.random().toString(36).substring(2,8)+'.'+ext;
+  try{
+    var r = await _sb.storage.from('notas_fiscais').upload(nome, file, {cacheControl:'3600', upsert:false});
+    if(r.error){console.error('[upload]',r.error);toast('Erro ao enviar anexo: '+r.error.message,'error');return null}
+    return r.data && r.data.path ? r.data.path : nome;
+  }catch(e){console.error('[upload]',e);toast('Falha no upload','error');return null}
+}
+
+async function getUrlAnexo(path){
+  if(!path||!_sb) return null;
+  try{
+    var r = await _sb.storage.from('notas_fiscais').createSignedUrl(path, 3600); // 1 hora
+    if(r.error){console.error('[signedUrl]',r.error);return null}
+    return r.data && r.data.signedUrl ? r.data.signedUrl : null;
+  }catch(e){console.error('[signedUrl]',e);return null}
+}
+
+window.abrirAnexo = async function(path){
+  var url = await getUrlAnexo(path);
+  if(url) window.open(url, '_blank');
+  else toast('Não foi possível abrir o anexo','error');
+};
+
+// ==================== PARSE DE QR CODE DE NFC-e ====================
+// Extrai dados básicos da URL do QR (chave de acesso, valor, data, CNPJ, UF)
+function parseQrNFCe(url){
+  if(!url) return null;
+  try{
+    var resultado = {
+      linkSefaz: url,
+      chaveAcesso: '',
+      cnpjEmitente: '',
+      ufEmitente: '',
+      valorTotal: 0,
+      dataEmissao: ''
+    };
+    // Tenta extrair via parâmetro "p=" (formato comum)
+    var match = url.match(/[?&#]p=([^&]*)/i);
+    if(match){
+      var partes = decodeURIComponent(match[1]).split('|');
+      // Padrão: chave|versao|tpAmb|cIdToken|valorTotal|digestValue|csc
+      // Padrão alt: chave|versao|tpAmb|...|cDest|csc
+      if(partes[0] && partes[0].length===44){
+        resultado.chaveAcesso = partes[0];
+      }
+      // Tenta encontrar valor (geralmente índice 4)
+      partes.forEach(function(p){
+        // valor monetário: número decimal com 1-15 dígitos antes do ponto e 2 depois
+        if(/^\d+\.\d{2}$/.test(p) && parseFloat(p)>0){
+          if(!resultado.valorTotal) resultado.valorTotal = parseFloat(p);
+        }
+      });
+    }
+    // Se não pegou pelo p=, tenta extrair chave de 44 dígitos da URL inteira
+    if(!resultado.chaveAcesso){
+      var chaveMatch = url.match(/(\d{44})/);
+      if(chaveMatch) resultado.chaveAcesso = chaveMatch[1];
+    }
+    // A chave de acesso tem informações estruturadas:
+    // Pos  0-1: UF (código IBGE)
+    // Pos  2-5: AAMM (ano e mês de emissão)
+    // Pos  6-19: CNPJ do emitente (14 dígitos)
+    // Pos 20-21: modelo (55=NFe, 65=NFCe)
+    if(resultado.chaveAcesso && resultado.chaveAcesso.length===44){
+      var ufCodigo = resultado.chaveAcesso.substring(0,2);
+      var aamm = resultado.chaveAcesso.substring(2,6);
+      var cnpj = resultado.chaveAcesso.substring(6,20);
+      // Mapeia código IBGE → UF
+      var ufMap = {'12':'AC','27':'AL','13':'AM','16':'AP','29':'BA','23':'CE','53':'DF','32':'ES','52':'GO','21':'MA','31':'MG','50':'MS','51':'MT','15':'PA','25':'PB','26':'PE','22':'PI','41':'PR','33':'RJ','24':'RN','11':'RO','14':'RR','43':'RS','42':'SC','28':'SE','35':'SP','17':'TO'};
+      resultado.ufEmitente = ufMap[ufCodigo] || '';
+      resultado.cnpjEmitente = cnpj;
+      // Data emissão: AAMM → assume dia 01 (não dá pra precisar pelo QR)
+      var ano = '20'+aamm.substring(0,2);
+      var mes = aamm.substring(2,4);
+      resultado.dataEmissao = ano+'-'+mes+'-01';
+    }
+    return resultado;
+  }catch(e){console.error('[parseQR]',e);return null}
+}
+
 // Sub-aba dentro de Compras: 'kanban' | 'fornecedores' | 'arquivadas'
 function renderCompras(){
   var sub = S._compraSubAba || 'kanban';
@@ -2246,12 +2333,668 @@ window.excluirCompra = async function(id){
   render();
 };
 
-// Stubs (serão implementados na Mensagem 3)
-window.openNovaCompra = function(){toast('Cadastro de compra — em breve (Mensagem 3)','info')};
-window.abrirCompra = function(id){toast('Detalhes da compra — em breve (Mensagem 3)','info')};
-window.abrirRecebimento = function(id){toast('Conferência de recebimento — em breve (Mensagem 3)','info')};
+// ==================== NOVA COMPRA ====================
+window.openNovaCompra = function(){
+  S.compraEdit = {
+    id: null,
+    fornecedorId: null,
+    chaveAcesso: '',
+    numeroDocumento: '',
+    cnpjEmitente: '',
+    ufEmitente: '',
+    linkSefaz: '',
+    dataPedido: today(),
+    dataPagamento: null,
+    dataRecebimento: null,
+    subtotal: 0,
+    valorFrete: 0,
+    valorDesconto: 0,
+    total: 0,
+    formaPagamento: '',
+    codigoRastreio: '',
+    status: 'pedido_feito',
+    modoItens: 'detalhado',
+    notaFiscalPath: '',
+    comprovantePagamentoPath: '',
+    observacoes: ''
+  };
+  S.compraEditItens = [];
+  S.compraEditNFFile = null;
+  S.compraEditCompFile = null;
+  S.modal = 'novaCompra';
+  render();
+};
 
-// ==================== FORNECEDORES ====================
+window.abrirCompra = function(id){
+  var c = (S.compras||[]).find(function(x){return x.id===id}); if(!c) return;
+  S.compraEdit = JSON.parse(JSON.stringify(c));  // clona pra não bagunçar estado
+  S.compraEditItens = getItensDaCompra(id).map(function(ci){return JSON.parse(JSON.stringify(ci))});
+  S.compraEditNFFile = null;
+  S.compraEditCompFile = null;
+  S.modal = 'novaCompra';
+  render();
+};
+
+window.abrirRecebimento = function(id){
+  var c = (S.compras||[]).find(function(x){return x.id===id}); if(!c) return;
+  S.compraRecebimento = JSON.parse(JSON.stringify(c));
+  S.compraRecebimentoItens = getItensDaCompra(id).map(function(ci){
+    var clone = JSON.parse(JSON.stringify(ci));
+    // Pré-preenche qtd_recebida com a quantidade pedida (se ainda não recebeu)
+    if(!clone.qtdRecebida || clone.qtdRecebida===0) clone.qtdRecebida = clone.quantidade;
+    return clone;
+  });
+  S.modal = 'receberCompra';
+  render();
+};
+
+// Modal de Nova/Editar Compra
+function mNovaCompra(){
+  var c = S.compraEdit || {};
+  var isEdit = !!c.id;
+  var itens = S.compraEditItens || [];
+  var fornec = getFornecedor(c.fornecedorId);
+  var titulo = isEdit ? 'Editar Compra #'+c.id : 'Nova Compra';
+
+  // Calcula totais ao vivo
+  var subtotal = 0;
+  itens.forEach(function(ci){
+    ci.valorTotal = (parseFloat(ci.quantidade)||0) * (parseFloat(ci.valorUnitario)||0);
+    subtotal += ci.valorTotal;
+  });
+  c.subtotal = subtotal;
+  c.total = subtotal + (parseFloat(c.valorFrete)||0) - (parseFloat(c.valorDesconto)||0);
+
+  var html = '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide" style="max-width:880px"><h3>'+titulo+'</h3>';
+
+  // Botões de captura (só na criação)
+  if(!isEdit){
+    html += '<div style="background:var(--bg2);padding:10px;border-radius:8px;margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+
+      '<span style="font-size:13px;color:var(--text2);font-weight:500">Como deseja preencher?</span>'+
+      '<button class="btn btn-sm btn-info" onclick="abrirLeitorQR()">📷 Ler QR do cupom</button>'+
+      '<span style="font-size:12px;color:var(--text3)">ou preencha manualmente abaixo</span>'+
+      '</div>';
+  }
+
+  // === Dados do fornecedor / nota ===
+  html += '<h4 style="margin:8px 0;color:var(--accent);font-size:14px">📋 Identificação</h4>';
+  html += '<div class="form-group-row" style="display:flex;gap:8px;flex-wrap:wrap">';
+  html += '<div class="form-group" style="flex:2;min-width:200px"><label>Fornecedor</label><select id="ncFornec">';
+  html += '<option value="">— Sem fornecedor (compra informal) —</option>';
+  (S.fornecedores||[]).filter(function(f){return f.ativo}).forEach(function(f){
+    html += '<option value="'+f.id+'"'+(c.fornecedorId===f.id?' selected':'')+'>'+esc(f.nome)+(f.especialidade?' • '+esc(f.especialidade):'')+'</option>';
+  });
+  html += '</select><div style="margin-top:4px"><a href="#" onclick="rapidoNovoFornecedor();return false" style="font-size:11px;color:var(--accent)">+ Cadastrar novo fornecedor</a></div></div>';
+  html += '<div class="form-group" style="flex:1;min-width:140px"><label>Data do pedido</label><input id="ncData" type="date" value="'+esc(c.dataPedido||today())+'"></div>';
+  html += '</div>';
+
+  // Linha NF-e (só mostra se há dados ou se foi capturado QR)
+  if(c.chaveAcesso || c.cnpjEmitente || c.linkSefaz){
+    html += '<div style="background:#E8F4FD;padding:10px;border-radius:8px;margin-bottom:10px;font-size:12px">';
+    html += '<div style="font-weight:600;margin-bottom:4px">🧾 Dados fiscais (capturados do QR)</div>';
+    if(c.chaveAcesso) html += '<div>Chave de acesso: <code style="font-size:11px">'+esc(c.chaveAcesso)+'</code></div>';
+    if(c.cnpjEmitente) html += '<div>CNPJ emitente: '+mascararCpfCnpj(c.cnpjEmitente)+' / UF: '+esc(c.ufEmitente||'?')+'</div>';
+    if(c.linkSefaz) html += '<div><a href="'+esc(c.linkSefaz)+'" target="_blank" style="color:var(--accent)">🔗 Abrir consulta SEFAZ</a></div>';
+    html += '<button class="btn btn-sm btn-outline" onclick="limparDadosFiscais()" style="margin-top:6px">Limpar</button>';
+    html += '</div>';
+  }
+
+  html += '<div class="form-group"><label>Número do cupom/recibo (opcional)</label><input id="ncNumDoc" value="'+esc(c.numeroDocumento||'')+'" placeholder="Número da nota ou cupom"></div>';
+
+  // === Modo de itens ===
+  html += '<h4 style="margin:14px 0 8px;color:var(--accent);font-size:14px">📦 Itens da compra</h4>';
+  html += '<div class="form-group"><label>Modo de cadastro</label><div style="display:flex;gap:12px;flex-wrap:wrap">';
+  html += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;border:2px solid '+(c.modoItens==='detalhado'?'var(--accent)':'var(--border)')+';border-radius:6px"><input type="radio" name="modoItens" value="detalhado" '+(c.modoItens==='detalhado'?'checked':'')+' onchange="setModoItens(\'detalhado\')"> <strong>Detalhado</strong> <span style="font-size:11px;color:var(--text2)">(cada item separado, atualiza estoque)</span></label>';
+  html += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;border:2px solid '+(c.modoItens==='agrupado'?'var(--accent)':'var(--border)')+';border-radius:6px"><input type="radio" name="modoItens" value="agrupado" '+(c.modoItens==='agrupado'?'checked':'')+' onchange="setModoItens(\'agrupado\')"> <strong>Agrupado</strong> <span style="font-size:11px;color:var(--text2)">(1 linha "Diversos", só registra gasto)</span></label>';
+  html += '</div></div>';
+
+  // Tabela de itens
+  if(itens.length){
+    html += '<div class="table-wrap" style="margin-bottom:8px"><div class="table-scroll"><table><thead><tr><th>Item</th><th style="width:80px">Qtd</th><th style="width:80px">Un.</th><th style="width:110px">R$ Unit.</th><th style="width:110px">R$ Total</th><th style="width:40px"></th></tr></thead><tbody>';
+    itens.forEach(function(ci, idx){
+      html += '<tr>';
+      if(c.modoItens==='agrupado'){
+        html += '<td><input type="text" value="'+esc(ci.descricao||'Diversos')+'" oninput="atualizarItemCompra('+idx+',\'descricao\',this.value)" placeholder="Descrição"></td>';
+      } else {
+        // Detalhado: dropdown de items existentes + opção "novo"
+        var itemRef = ci.itemId ? S.items.find(function(i){return i.id===ci.itemId}) : null;
+        var nomeItem = itemRef ? itemRef.nome : (ci.descricao||'');
+        html += '<td><div style="position:relative">'+
+          '<input type="text" id="ncItem_'+idx+'" value="'+esc(nomeItem)+'" oninput="buscarItemCompra('+idx+',this.value);atualizarItemCompra('+idx+',\'descricao\',this.value)" placeholder="Buscar item ou cadastrar novo" autocomplete="off">'+
+          '<div id="ncItemSugest_'+idx+'" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,.1)"></div>'+
+          '</div>'+
+          (ci.itemId?'<div style="font-size:10px;color:var(--success);margin-top:2px">✓ vinculado ao item #'+ci.itemId+'</div>':(ci.descricao?'<div style="font-size:10px;color:var(--text3);margin-top:2px">novo item — será criado ao salvar</div>':''))+
+          '</td>';
+      }
+      html += '<td><input type="number" step="any" min="0" value="'+ci.quantidade+'" oninput="atualizarItemCompra('+idx+',\'quantidade\',this.value)" style="width:100%"></td>';
+      html += '<td><input type="text" value="'+esc(ci.unidadeMedida||'un')+'" oninput="atualizarItemCompra('+idx+',\'unidadeMedida\',this.value)" placeholder="un" style="width:100%"></td>';
+      html += '<td><input type="number" step="0.01" min="0" value="'+ci.valorUnitario+'" oninput="atualizarItemCompra('+idx+',\'valorUnitario\',this.value)" style="width:100%"></td>';
+      html += '<td style="font-weight:600">R$ '+(ci.valorTotal||0).toFixed(2).replace('.',',')+'</td>';
+      html += '<td><button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="removerItemCompra('+idx+')" title="Remover">×</button></td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+  } else {
+    html += '<div class="empty-state" style="padding:20px;background:var(--bg2);border-radius:8px">Nenhum item adicionado.</div>';
+  }
+  html += '<button class="btn btn-sm btn-success" onclick="adicionarItemCompra()">+ Adicionar item</button>';
+
+  // === Valores ===
+  html += '<h4 style="margin:14px 0 8px;color:var(--accent);font-size:14px">💰 Valores</h4>';
+  html += '<div class="form-group-row" style="display:flex;gap:8px;flex-wrap:wrap">';
+  html += '<div class="form-group" style="flex:1;min-width:120px"><label>Subtotal (calculado)</label><input type="text" value="R$ '+(subtotal).toFixed(2).replace('.',',')+'" readonly style="background:var(--bg2)"></div>';
+  html += '<div class="form-group" style="flex:1;min-width:120px"><label>Frete</label><input id="ncFrete" type="number" step="0.01" min="0" value="'+(c.valorFrete||0)+'" oninput="atualizarValorCompra(\'valorFrete\',this.value)"></div>';
+  html += '<div class="form-group" style="flex:1;min-width:120px"><label>Desconto</label><input id="ncDesc" type="number" step="0.01" min="0" value="'+(c.valorDesconto||0)+'" oninput="atualizarValorCompra(\'valorDesconto\',this.value)"></div>';
+  html += '<div class="form-group" style="flex:1;min-width:120px"><label><strong>Total</strong></label><input type="text" value="R$ '+((c.total)||0).toFixed(2).replace('.',',')+'" readonly style="background:var(--accent-bg);font-weight:700"></div>';
+  html += '</div>';
+
+  // === Pagamento + logística ===
+  html += '<div class="form-group-row" style="display:flex;gap:8px;flex-wrap:wrap">';
+  html += '<div class="form-group" style="flex:1;min-width:140px"><label>Forma de pagamento</label><select id="ncForma">';
+  ['','PIX','Dinheiro','Cartão de débito','Cartão de crédito','Transferência','Boleto','Crediário'].forEach(function(fp){
+    html += '<option value="'+fp+'"'+(c.formaPagamento===fp?' selected':'')+'>'+(fp||'— a definir —')+'</option>';
+  });
+  html += '</select></div>';
+  html += '<div class="form-group" style="flex:1;min-width:140px"><label>Cód. rastreio</label><input id="ncRastreio" value="'+esc(c.codigoRastreio||'')+'" placeholder="Se houver"></div>';
+  html += '</div>';
+
+  // === Anexos ===
+  html += '<h4 style="margin:14px 0 8px;color:var(--accent);font-size:14px">📎 Anexos</h4>';
+  html += '<div class="form-group"><label>Foto/PDF da nota fiscal</label>';
+  if(c.notaFiscalPath){
+    html += '<div style="display:flex;gap:8px;align-items:center;padding:8px;background:var(--bg2);border-radius:6px"><span>📎 Anexo já enviado</span><button class="btn btn-sm btn-info" onclick="abrirAnexo(\''+esc(c.notaFiscalPath)+'\')">Ver</button><button class="btn btn-sm btn-outline" onclick="removerAnexoNF()">Remover</button></div>';
+  } else {
+    html += '<input type="file" id="ncFileNF" accept="image/*,application/pdf" onchange="onFileSelectedNF(this.files[0])">';
+    if(S.compraEditNFFile) html += '<div style="font-size:12px;color:var(--success);margin-top:4px">✓ '+esc(S.compraEditNFFile.name)+' selecionado (será enviado ao salvar)</div>';
+  }
+  html += '</div>';
+
+  html += '<div class="form-group"><label>Comprovante de pagamento</label>';
+  if(c.comprovantePagamentoPath){
+    html += '<div style="display:flex;gap:8px;align-items:center;padding:8px;background:var(--bg2);border-radius:6px"><span>📎 Comprovante já enviado</span><button class="btn btn-sm btn-info" onclick="abrirAnexo(\''+esc(c.comprovantePagamentoPath)+'\')">Ver</button><button class="btn btn-sm btn-outline" onclick="removerAnexoComp()">Remover</button></div>';
+  } else {
+    html += '<input type="file" id="ncFileComp" accept="image/*,application/pdf" onchange="onFileSelectedComp(this.files[0])">';
+    if(S.compraEditCompFile) html += '<div style="font-size:12px;color:var(--success);margin-top:4px">✓ '+esc(S.compraEditCompFile.name)+' selecionado</div>';
+  }
+  html += '</div>';
+
+  html += '<div class="form-group"><label>Observações</label><textarea id="ncObs" rows="2" placeholder="Anotações livres...">'+esc(c.observacoes||'')+'</textarea></div>';
+
+  html += '<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="salvarCompra()">'+(isEdit?'Salvar alterações':'Cadastrar compra')+'</button></div>';
+
+  html += '</div></div>';
+  return html;
+}
+
+// Helpers do modal de compra
+window.setModoItens = function(modo){
+  if(!S.compraEdit) return;
+  S.compraEdit.modoItens = modo;
+  if(modo==='agrupado'){
+    // Vira tudo em 1 linha "Diversos" preservando o total
+    var totalAtual = (S.compraEditItens||[]).reduce(function(a,b){return a + ((parseFloat(b.quantidade)||1)*(parseFloat(b.valorUnitario)||0))},0);
+    S.compraEditItens = [{
+      descricao: 'Diversos',
+      quantidade: 1,
+      unidadeMedida: 'un',
+      valorUnitario: totalAtual,
+      valorTotal: totalAtual,
+      itemId: null,
+      qtdRecebida: 0
+    }];
+  } else if(modo==='detalhado' && S.compraEditItens.length===1 && S.compraEditItens[0].descricao==='Diversos'){
+    // Volta para detalhado: limpa o "Diversos" para o usuário cadastrar item por item
+    S.compraEditItens = [];
+  }
+  render();
+};
+
+window.adicionarItemCompra = function(){
+  S.compraEditItens = S.compraEditItens || [];
+  S.compraEditItens.push({
+    descricao: '',
+    quantidade: 1,
+    unidadeMedida: 'un',
+    valorUnitario: 0,
+    valorTotal: 0,
+    itemId: null,
+    qtdRecebida: 0
+  });
+  render();
+};
+
+window.removerItemCompra = function(idx){
+  if(!S.compraEditItens) return;
+  S.compraEditItens.splice(idx, 1);
+  render();
+};
+
+window.atualizarItemCompra = function(idx, campo, valor){
+  if(!S.compraEditItens || !S.compraEditItens[idx]) return;
+  if(campo==='quantidade' || campo==='valorUnitario'){
+    S.compraEditItens[idx][campo] = parseFloat(valor)||0;
+  } else {
+    S.compraEditItens[idx][campo] = valor;
+  }
+  // Não rerenderiza imediatamente para não perder foco do input — recalcula só os totais
+  // Atualiza apenas o campo R$ Total visualmente. Próximo render atualiza tudo.
+};
+
+window.atualizarValorCompra = function(campo, valor){
+  if(!S.compraEdit) return;
+  S.compraEdit[campo] = parseFloat(valor)||0;
+  // Atualiza total
+  var sub = (S.compraEditItens||[]).reduce(function(a,b){return a+((parseFloat(b.quantidade)||0)*(parseFloat(b.valorUnitario)||0))},0);
+  S.compraEdit.subtotal = sub;
+  S.compraEdit.total = sub + (parseFloat(S.compraEdit.valorFrete)||0) - (parseFloat(S.compraEdit.valorDesconto)||0);
+  // Atualiza só o input do total
+  // (Não chamamos render para não perder foco)
+};
+
+// Autocomplete de itens existentes
+window.buscarItemCompra = function(idx, termo){
+  var sugest = document.getElementById('ncItemSugest_'+idx);
+  if(!sugest) return;
+  termo = (termo||'').trim().toLowerCase();
+  if(termo.length<2){sugest.style.display='none';return}
+  var matches = (S.items||[]).filter(function(it){return it.nome.toLowerCase().indexOf(termo)>=0}).slice(0,8);
+  if(!matches.length){
+    sugest.innerHTML = '<div style="padding:8px;color:var(--text3);font-size:12px">Nenhum item encontrado. <em>Será criado novo.</em></div>';
+    sugest.style.display = 'block';
+    // Limpa itemId — vai virar item novo
+    if(S.compraEditItens[idx]) S.compraEditItens[idx].itemId = null;
+    return;
+  }
+  sugest.innerHTML = matches.map(function(it){
+    return '<div onclick="selecionarItemSugerido('+idx+','+it.id+')" style="padding:8px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px" onmouseover="this.style.background=\'var(--bg2)\'" onmouseout="this.style.background=\'\'">📦 '+esc(it.nome)+' <span style="color:var(--text3);font-size:11px">'+esc(it.tipo||'')+' • '+esc(it.secao||'')+'</span></div>';
+  }).join('');
+  sugest.style.display = 'block';
+};
+
+window.selecionarItemSugerido = function(idx, itemId){
+  var item = S.items.find(function(i){return i.id===itemId});
+  if(!item || !S.compraEditItens[idx]) return;
+  S.compraEditItens[idx].itemId = item.id;
+  S.compraEditItens[idx].descricao = item.nome;
+  S.compraEditItens[idx].unidadeMedida = item.unidadeMedida || 'un';
+  // Sugere valor unitário do último custo se houver
+  if(item.ultimoCustoUnitario && !S.compraEditItens[idx].valorUnitario){
+    S.compraEditItens[idx].valorUnitario = item.ultimoCustoUnitario;
+  }
+  document.getElementById('ncItemSugest_'+idx).style.display = 'none';
+  render();
+};
+
+window.onFileSelectedNF = function(file){
+  if(file && file.size > 10*1024*1024){
+    alert('Arquivo muito grande. Máximo 10 MB.');
+    return;
+  }
+  S.compraEditNFFile = file;
+  render();
+};
+window.onFileSelectedComp = function(file){
+  if(file && file.size > 10*1024*1024){
+    alert('Arquivo muito grande. Máximo 10 MB.');
+    return;
+  }
+  S.compraEditCompFile = file;
+  render();
+};
+window.removerAnexoNF = function(){
+  if(S.compraEdit) S.compraEdit.notaFiscalPath = '';
+  S.compraEditNFFile = null;
+  render();
+};
+window.removerAnexoComp = function(){
+  if(S.compraEdit) S.compraEdit.comprovantePagamentoPath = '';
+  S.compraEditCompFile = null;
+  render();
+};
+window.limparDadosFiscais = function(){
+  if(!S.compraEdit) return;
+  S.compraEdit.chaveAcesso = '';
+  S.compraEdit.cnpjEmitente = '';
+  S.compraEdit.ufEmitente = '';
+  S.compraEdit.linkSefaz = '';
+  render();
+};
+
+window.rapidoNovoFornecedor = function(){
+  S._compraSubAba = 'fornecedores';  // marca pra voltar pra lá
+  toast('Cadastre o fornecedor primeiro, depois retorne em + Nova Compra','info');
+  closeModal();
+  S._compraSubAba = 'fornecedores';
+  S.activeTab = 'compras';
+  render();
+  setTimeout(function(){window.openNovoFornecedor()},200);
+};
+
+// Salva a compra (criação ou edição)
+window.salvarCompra = async function(){
+  var c = S.compraEdit;
+  var itens = S.compraEditItens || [];
+  if(!c) return;
+
+  // Coleta dados dos inputs do form
+  var fornSel = document.getElementById('ncFornec');
+  if(fornSel) c.fornecedorId = parseInt(fornSel.value)||null;
+  var dt = document.getElementById('ncData');
+  if(dt) c.dataPedido = dt.value || today();
+  var nd = document.getElementById('ncNumDoc');
+  if(nd) c.numeroDocumento = nd.value.trim();
+  var fr = document.getElementById('ncFrete');
+  if(fr) c.valorFrete = parseFloat(fr.value)||0;
+  var ds = document.getElementById('ncDesc');
+  if(ds) c.valorDesconto = parseFloat(ds.value)||0;
+  var fp = document.getElementById('ncForma');
+  if(fp) c.formaPagamento = fp.value;
+  var rs = document.getElementById('ncRastreio');
+  if(rs) c.codigoRastreio = rs.value.trim();
+  var ob = document.getElementById('ncObs');
+  if(ob) c.observacoes = ob.value.trim();
+
+  // Validações
+  if(!itens.length) return toast('Adicione ao menos um item','error');
+  for(var i=0;i<itens.length;i++){
+    if(!itens[i].descricao || !itens[i].descricao.trim()) return toast('Item #'+(i+1)+' sem descrição','error');
+    if(!(parseFloat(itens[i].quantidade)>0)) return toast('Item "'+itens[i].descricao+'" com quantidade inválida','error');
+  }
+
+  // Calcula totais
+  c.subtotal = itens.reduce(function(a,b){return a+((parseFloat(b.quantidade)||0)*(parseFloat(b.valorUnitario)||0))},0);
+  c.total = c.subtotal + (parseFloat(c.valorFrete)||0) - (parseFloat(c.valorDesconto)||0);
+
+  // Upload de anexos novos (se houver)
+  if(S.compraEditNFFile){
+    toast('Enviando nota fiscal...','info');
+    var pathNF = await uploadAnexoCompra(S.compraEditNFFile, 'nota');
+    if(pathNF) c.notaFiscalPath = pathNF;
+  }
+  if(S.compraEditCompFile){
+    toast('Enviando comprovante...','info');
+    var pathComp = await uploadAnexoCompra(S.compraEditCompFile, 'comprovante');
+    if(pathComp) c.comprovantePagamentoPath = pathComp;
+  }
+
+  // Salva (insert ou update)
+  var compraSalva;
+  if(c.id){
+    var dbPayload = _stampUpdate(compraToDB(c));
+    var ok = await saveRecord('compras', c.id, dbPayload);
+    if(!ok) return toast('Falha ao salvar compra','error');
+    Object.assign(c, {atualizadoEm:dbPayload.atualizado_em, atualizadoPor:dbPayload.atualizado_por});
+    var idx = S.compras.findIndex(function(x){return x.id===c.id});
+    if(idx>=0) S.compras[idx] = c;
+    compraSalva = c;
+  } else {
+    var dbNew = _stampInsert(compraToDB(c));
+    var inserted = await insertRecord('compras', dbNew);
+    if(!inserted) return toast('Falha ao criar compra','error');
+    compraSalva = compraFromDB(inserted);
+    S.compras = S.compras || [];
+    S.compras.unshift(compraSalva);
+  }
+
+  // === SALVA OS ITENS ===
+  // Estratégia: deleta todos os itens existentes da compra e insere os novos.
+  // Isso é mais simples e seguro que tentar fazer diff.
+  if(c.id){
+    try{
+      var hDel = await getAuthHeaders();
+      await fetch(SUPABASE_URL+'/rest/v1/compra_itens?compra_id=eq.'+c.id, {method:'DELETE',headers:hDel});
+      S.compraItens = (S.compraItens||[]).filter(function(ci){return ci.compraId!==c.id});
+    }catch(e){console.error('[delItens]',e)}
+  }
+
+  // Para cada item: se não tem itemId e modo é 'detalhado', cria item novo no estoque
+  for(var i2=0;i2<itens.length;i2++){
+    var ci = itens[i2];
+    ci.compraId = compraSalva.id;
+    if(c.modoItens==='detalhado' && !ci.itemId && ci.descricao && ci.descricao.trim() && ci.descricao.trim().toLowerCase()!=='diversos'){
+      // Cria item novo no estoque
+      var novoItem = {
+        nome: ci.descricao.trim(),
+        tipo: 'Item',
+        secao: 'Não definida',
+        localizacao: '',
+        estoqueAtual: 0,  // será atualizado no recebimento
+        unidadeMedida: ci.unidadeMedida || 'un',
+        estoqueMinimo: 0,
+        observacoes: 'Criado automaticamente via Compra #'+compraSalva.id
+      };
+      var dbItem = _stampInsert(itemToDB(novoItem));
+      try{
+        var insItem = await insertRecord('items', dbItem);
+        if(insItem){
+          var itemMapeado = itemFromDB(insItem);
+          S.items.push(itemMapeado);
+          ci.itemId = itemMapeado.id;
+        }
+      }catch(e){console.error('[novoItem]',e)}
+    }
+    // Insere a linha
+    var ciDB = compraItemToDB(ci);
+    delete ciDB.id;  // garante insert
+    try{
+      var insCi = await insertRecord('compra_itens', ciDB);
+      if(insCi){
+        S.compraItens = S.compraItens || [];
+        S.compraItens.push(compraItemFromDB(insCi));
+      }
+    }catch(e){console.error('[insCi]',e)}
+  }
+
+  addHistDB((c.id?'Compra editada #':'+ Compra #')+compraSalva.id+(getFornecedor(compraSalva.fornecedorId)?' • '+getFornecedor(compraSalva.fornecedorId).nome:'')+' • R$'+compraSalva.total.toFixed(2));
+  toast(c.id?'Compra atualizada!':'Compra cadastrada!');
+  S.compraEdit = null;
+  S.compraEditItens = [];
+  S.compraEditNFFile = null;
+  S.compraEditCompFile = null;
+  closeModal();
+};
+
+// ==================== LEITOR DE QR CODE ====================
+window.abrirLeitorQR = function(){
+  S.modal = 'leitorQR';
+  render();
+  setTimeout(iniciarScanner, 200);
+};
+
+var _qrScanner = null;
+function iniciarScanner(){
+  var div = document.getElementById('qrReader');
+  if(!div || typeof Html5Qrcode==='undefined'){
+    if(div) div.innerHTML = '<div style="padding:20px;color:var(--danger)">Biblioteca de QR não carregou. Verifique conexão.</div>';
+    return;
+  }
+  try{
+    _qrScanner = new Html5Qrcode('qrReader');
+    _qrScanner.start(
+      {facingMode:'environment'},  // câmera traseira
+      {fps:10, qrbox:{width:280, height:280}},
+      function(texto, raw){
+        // QR detectado
+        pararScanner();
+        processarQRDetectado(texto);
+      },
+      function(err){/* ignora erros de frame */}
+    ).catch(function(e){
+      div.innerHTML = '<div style="padding:20px;color:var(--danger)">Não foi possível acessar a câmera: '+e.message+'<br><br>No celular, dê permissão de câmera ao site. No PC, verifique se há webcam disponível.</div>';
+    });
+  }catch(e){
+    div.innerHTML = '<div style="padding:20px;color:var(--danger)">Erro: '+e.message+'</div>';
+  }
+}
+
+function pararScanner(){
+  if(_qrScanner){
+    try{_qrScanner.stop().catch(function(){})}catch(e){}
+    _qrScanner = null;
+  }
+}
+
+window.fecharLeitorQR = function(){
+  pararScanner();
+  S.modal = 'novaCompra';
+  render();
+};
+
+window.processarQRManual = function(){
+  var inp = document.getElementById('qrManual');
+  if(!inp || !inp.value.trim()) return;
+  pararScanner();
+  processarQRDetectado(inp.value.trim());
+};
+
+function processarQRDetectado(texto){
+  var parsed = parseQrNFCe(texto);
+  if(!parsed){
+    alert('Não foi possível interpretar o QR. Você pode preencher manualmente.');
+    S.modal = 'novaCompra';
+    render();
+    return;
+  }
+  // Preenche dados na compra atual
+  if(!S.compraEdit) S.compraEdit = {};
+  S.compraEdit.linkSefaz = parsed.linkSefaz;
+  S.compraEdit.chaveAcesso = parsed.chaveAcesso;
+  S.compraEdit.cnpjEmitente = parsed.cnpjEmitente;
+  S.compraEdit.ufEmitente = parsed.ufEmitente;
+  if(parsed.dataEmissao) S.compraEdit.dataPedido = parsed.dataEmissao;
+  // Tenta achar fornecedor existente pelo CNPJ
+  if(parsed.cnpjEmitente){
+    var existente = (S.fornecedores||[]).find(function(f){
+      return (f.cnpjCpf||'').replace(/\D/g,'') === parsed.cnpjEmitente;
+    });
+    if(existente){
+      S.compraEdit.fornecedorId = existente.id;
+      toast('Fornecedor reconhecido: '+existente.nome,'success');
+    } else {
+      toast('CNPJ '+parsed.cnpjEmitente+' não cadastrado. Cadastre o fornecedor depois se quiser.','info');
+    }
+  }
+  if(parsed.valorTotal && !S.compraEditItens.length){
+    // Cria 1 linha "Diversos" agrupada com o valor total
+    S.compraEdit.modoItens = 'agrupado';
+    S.compraEditItens = [{
+      descricao: 'Diversos (importado da NFC-e)',
+      quantidade: 1,
+      unidadeMedida: 'un',
+      valorUnitario: parsed.valorTotal,
+      valorTotal: parsed.valorTotal,
+      itemId: null,
+      qtdRecebida: 0
+    }];
+  }
+  S.modal = 'novaCompra';
+  render();
+  toast('QR processado! Revise os dados e confirme.');
+}
+
+function mLeitorQR(){
+  return '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide" style="max-width:520px"><h3>📷 Ler QR Code do cupom</h3>'+
+    '<p style="font-size:13px;color:var(--text2);margin-bottom:12px">Aponte a câmera para o QR Code do cupom fiscal (NFC-e). O sistema vai capturar automaticamente os dados básicos: CNPJ, valor e data.</p>'+
+    '<div id="qrReader" style="width:100%;min-height:280px;background:#000;border-radius:8px;overflow:hidden"></div>'+
+    '<div style="margin-top:12px"><label style="font-size:12px;color:var(--text2)">Ou cole a URL/chave manualmente:</label>'+
+    '<div style="display:flex;gap:6px;margin-top:4px"><input id="qrManual" placeholder="https://www.fazenda... ou 44 dígitos" style="flex:1"><button class="btn btn-sm btn-primary" onclick="processarQRManual()">OK</button></div></div>'+
+    '<div class="modal-actions"><button class="btn btn-outline" onclick="fecharLeitorQR()">Voltar</button></div>'+
+    '</div></div>';
+}
+
+// ==================== MODAL DE RECEBIMENTO ====================
+function mReceberCompra(){
+  var c = S.compraRecebimento || {};
+  var itens = S.compraRecebimentoItens || [];
+  var fornec = getFornecedor(c.fornecedorId);
+  var html = '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide" style="max-width:760px"><h3>📦 Conferir Recebimento — Compra #'+c.id+'</h3>';
+  html += '<div style="background:var(--bg2);padding:10px;border-radius:8px;margin-bottom:14px;font-size:13px"><strong>'+(fornec?esc(fornec.nome):'(sem fornecedor)')+'</strong> • '+fmtDate(c.dataPedido)+' • R$ '+(c.total||0).toFixed(2).replace('.',',')+'</div>';
+  html += '<p style="font-size:13px;color:var(--text2);margin-bottom:10px">Confira a quantidade efetivamente recebida de cada item. Pode receber tudo, parcial ou indicar problemas. Ao confirmar, o estoque será <strong>atualizado automaticamente</strong>.</p>';
+  if(c.modoItens==='agrupado'){
+    html += '<div style="background:#FEF5E7;border-left:3px solid #F39C12;padding:10px;border-radius:6px;margin-bottom:10px;font-size:12px">⚠ Esta compra está em modo <strong>Agrupado</strong> — não há itens detalhados, então o estoque não será afetado. Apenas marca como recebido.</div>';
+  }
+  html += '<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Item</th><th style="width:110px">Pedido</th><th style="width:140px">Recebido</th></tr></thead><tbody>';
+  itens.forEach(function(ci, idx){
+    var item = ci.itemId ? S.items.find(function(i){return i.id===ci.itemId}) : null;
+    var nomeExib = item ? item.nome : ci.descricao;
+    var estoqueAtual = item ? (parseFloat(item.estoqueAtual)||0) : null;
+    html += '<tr>';
+    html += '<td><strong>'+esc(nomeExib||'?')+'</strong>'+(item?'<div style="font-size:11px;color:var(--text3)">Estoque atual: '+fmtEstoque(item)+'</div>':'')+'</td>';
+    html += '<td>'+ci.quantidade+' '+esc(ci.unidadeMedida||'un')+'</td>';
+    html += '<td><input type="number" step="any" min="0" value="'+(ci.qtdRecebida||0)+'" oninput="atualizarRecebimento('+idx+',this.value)" style="width:100%"></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div></div>';
+  html += '<div class="modal-actions" style="margin-top:14px"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="confirmarRecebimento()">✓ Confirmar recebimento</button></div>';
+  html += '</div></div>';
+  return html;
+}
+
+window.atualizarRecebimento = function(idx, valor){
+  if(!S.compraRecebimentoItens || !S.compraRecebimentoItens[idx]) return;
+  S.compraRecebimentoItens[idx].qtdRecebida = parseFloat(valor)||0;
+};
+
+window.confirmarRecebimento = async function(){
+  var c = S.compraRecebimento;
+  var itens = S.compraRecebimentoItens || [];
+  if(!c) return;
+  if(!confirm('Confirmar recebimento da compra #'+c.id+'?\n\nO estoque dos itens detalhados será atualizado.')) return;
+
+  // Atualiza qtd_recebida em cada compra_item
+  for(var i=0;i<itens.length;i++){
+    var ci = itens[i];
+    try{
+      var hp = await getAuthHeaders();
+      await fetch(SUPABASE_URL+'/rest/v1/compra_itens?id=eq.'+ci.id, {
+        method:'PATCH',
+        headers:hp,
+        body: JSON.stringify({qtd_recebida: parseFloat(ci.qtdRecebida)||0})
+      });
+      // Atualiza no S.compraItens
+      var ciIdx = S.compraItens.findIndex(function(x){return x.id===ci.id});
+      if(ciIdx>=0) S.compraItens[ciIdx].qtdRecebida = parseFloat(ci.qtdRecebida)||0;
+    }catch(e){console.error('[updRec]',e)}
+
+    // Se modo detalhado e tem itemId, atualiza estoque do item
+    if(c.modoItens==='detalhado' && ci.itemId && ci.qtdRecebida>0){
+      var item = S.items.find(function(it){return it.id===ci.itemId});
+      if(item){
+        item.estoqueAtual = (parseFloat(item.estoqueAtual)||0) + (parseFloat(ci.qtdRecebida)||0);
+        item.ultimoCustoUnitario = parseFloat(ci.valorUnitario)||0;
+        item.dataUltimaCompra = today();
+        // Salva no banco
+        var dbItem = _stampUpdate(itemToDB(item));
+        // Adiciona campos extras que itemToDB não cobre
+        dbItem.ultimo_custo_unitario = item.ultimoCustoUnitario;
+        dbItem.data_ultima_compra = item.dataUltimaCompra;
+        try{
+          var hi = await getAuthHeaders();
+          await fetch(SUPABASE_URL+'/rest/v1/items?id=eq.'+item.id, {
+            method:'PATCH', headers:hi, body: JSON.stringify(dbItem)
+          });
+        }catch(e){console.error('[updItem]',e)}
+      }
+    }
+  }
+
+  // Marca compra como recebida
+  c.status = 'recebido';
+  c.dataRecebimento = today();
+  var dbCompra = _stampUpdate(compraToDB(c));
+  await saveRecord('compras', c.id, dbCompra);
+  // Atualiza S.compras
+  var idxC = S.compras.findIndex(function(x){return x.id===c.id});
+  if(idxC>=0) Object.assign(S.compras[idxC], c, {atualizadoEm:dbCompra.atualizado_em,atualizadoPor:dbCompra.atualizado_por});
+
+  addHistDB('Recebimento confirmado: Compra #'+c.id+(c.modoItens==='detalhado'?' (estoque atualizado)':''));
+  toast('Recebimento confirmado! '+(c.modoItens==='detalhado'?'Estoque atualizado.':''));
+  S.compraRecebimento = null;
+  S.compraRecebimentoItens = [];
+  closeModal();
+};
+
+// ==================== FORNECEDORES (mantida da Mensagem 2) ====================
 function renderFornecedores(){
   var fs = (S.fornecedores||[]).slice();
   // Filtro por busca
@@ -2820,6 +3563,9 @@ if(m==='gestaoItens')return mGestaoItens();
 if(m==='addCiclo')return mAddCiclo();if(m==='addInter'||m==='editInter')return mInter();
 if(m==='rastreio')return mRastreio();if(m==='definirFrete')return mDefinirFrete();if(m==='aprovarExclusao')return mAprovarExclusao();if(m==='confirmConsulta')return mConfirmConsulta();if(m==='changeConsPag')return mChangeConsPag();
 if(m==='editFornecedor')return mEditFornecedor();
+if(m==='novaCompra')return mNovaCompra();
+if(m==='leitorQR')return mLeitorQR();
+if(m==='receberCompra')return mReceberCompra();
 if(m==='addCrediario')return mAddCrediario();if(m==='pagCrediario')return mPagCrediario();
 if(m==='addLivro'||m==='editLivro')return mLivro();
 return ''}
