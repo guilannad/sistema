@@ -1904,7 +1904,7 @@ if(hasRole(['admin','editor']))tabs.push({key:'gerenciar',label:'Estoque'});
 if(hasRole(['admin','secretario','editor','babalawo','assistente']))tabs.push({key:'clientes',label:'Clientes'});
 if(hasRole(['admin','secretario','babalawo','assistente']))tabs.push({key:'dashboard_vendas',label:'Vendas'});
 if(hasRole(['admin','secretario','babalawo']))tabs.push({key:'crediario',label:'Crediário'});
-if(hasRole(['admin','secretario','babalawo']))tabs.push({key:'compras',label:'\\uD83D\\uDED2 Compras'});
+if(hasRole(['admin','secretario','babalawo']))tabs.push({key:'compras',label:'🛒 Compras'});
 if(hasRole(['admin']))tabs.push({key:'rel_vendas',label:'Relatórios'});
 if(hasRole(['admin']))tabs.push({key:'usuarios',label:'Usuários'});
 tabs.push({key:'biblioteca',label:'\uD83D\uDCDA Biblioteca'});
@@ -2348,6 +2348,54 @@ window.excluirFornecedor = async function(id){
 };
 
 // Modal de Fornecedor
+// ==================== MÁSCARAS BRASILEIRAS ====================
+// Formata CPF/CNPJ automaticamente conforme a quantidade de dígitos
+function mascararCpfCnpj(valor){
+  var d = String(valor||'').replace(/\D/g,'');
+  if(d.length<=11){
+    // CPF: 000.000.000-00
+    d = d.substring(0,11);
+    if(d.length>9) return d.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/, '$1.$2.$3-$4');
+    if(d.length>6) return d.replace(/(\d{3})(\d{3})(\d{0,3})/, '$1.$2.$3');
+    if(d.length>3) return d.replace(/(\d{3})(\d{0,3})/, '$1.$2');
+    return d;
+  } else {
+    // CNPJ: 00.000.000/0000-00
+    d = d.substring(0,14);
+    if(d.length>12) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2})/, '$1.$2.$3/$4-$5');
+    if(d.length>8) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{0,4})/, '$1.$2.$3/$4');
+    if(d.length>5) return d.replace(/(\d{2})(\d{3})(\d{0,3})/, '$1.$2.$3');
+    if(d.length>2) return d.replace(/(\d{2})(\d{0,3})/, '$1.$2');
+    return d;
+  }
+}
+
+// Telefone brasileiro: (00) 0000-0000 (10 dígitos) ou (00) 00000-0000 (11 dígitos)
+function mascararTelefone(valor){
+  var d = String(valor||'').replace(/\D/g,'').substring(0,11);
+  if(d.length<=2) return d.length>0 ? '('+d : '';
+  if(d.length<=6) return '('+d.substring(0,2)+') '+d.substring(2);
+  if(d.length<=10) return '('+d.substring(0,2)+') '+d.substring(2,6)+'-'+d.substring(6);
+  return '('+d.substring(0,2)+') '+d.substring(2,7)+'-'+d.substring(7);
+}
+
+// Aplica máscara ao input em tempo real
+window.aplicarMascaraCpfCnpj = function(input){
+  var posCursor = input.selectionStart;
+  var antesLength = input.value.length;
+  input.value = mascararCpfCnpj(input.value);
+  var depoisLength = input.value.length;
+  // Tenta manter cursor na posição relativa
+  try{ input.setSelectionRange(posCursor + (depoisLength - antesLength), posCursor + (depoisLength - antesLength)) }catch(e){}
+};
+window.aplicarMascaraTelefone = function(input){
+  var posCursor = input.selectionStart;
+  var antesLength = input.value.length;
+  input.value = mascararTelefone(input.value);
+  var depoisLength = input.value.length;
+  try{ input.setSelectionRange(posCursor + (depoisLength - antesLength), posCursor + (depoisLength - antesLength)) }catch(e){}
+};
+
 function mEditFornecedor(){
   var f = S.editFornecedor;
   var titulo = f ? 'Editar Fornecedor' : 'Novo Fornecedor';
@@ -2359,8 +2407,8 @@ function mEditFornecedor(){
         return '<option value="'+t+'"'+(f&&f.tipo===t?' selected':'')+'>'+lbl+'</option>';
       }).join('')+
     '</select></div>'+
-    '<div class="form-group" style="flex:1"><label>CNPJ / CPF</label><input id="fCnpj" value="'+esc(f?f.cnpjCpf:'')+'" placeholder="00.000.000/0000-00"></div></div>'+
-    '<div class="form-group-row" style="display:flex;gap:8px"><div class="form-group" style="flex:1"><label>Telefone / WhatsApp</label><input id="fTelefone" value="'+esc(f?f.telefone:'')+'" placeholder="(11) 99999-9999"></div>'+
+    '<div class="form-group" style="flex:1"><label>CNPJ / CPF</label><input id="fCnpj" value="'+esc(f?f.cnpjCpf:'')+'" placeholder="00.000.000/0000-00 ou 000.000.000-00" oninput="aplicarMascaraCpfCnpj(this)" inputmode="numeric"></div></div>'+
+    '<div class="form-group-row" style="display:flex;gap:8px"><div class="form-group" style="flex:1"><label>Telefone / WhatsApp</label><input id="fTelefone" value="'+esc(f?f.telefone:'')+'" placeholder="(11) 99999-9999" oninput="aplicarMascaraTelefone(this)" inputmode="numeric"></div>'+
     '<div class="form-group" style="flex:1"><label>Email</label><input id="fEmail" type="email" value="'+esc(f?f.email:'')+'" placeholder="contato@fornecedor.com"></div></div>'+
     '<div class="form-group"><label>Endereço</label><input id="fEndereco" value="'+esc(f?f.endereco:'')+'" placeholder="Rua, número, cidade..."></div>'+
     '<div class="form-group"><label>Especialidade</label><input id="fEspecialidade" value="'+esc(f?f.especialidade:'')+'" placeholder="Ex: ervas, louças, atacadão de itens religiosos"></div>'+
