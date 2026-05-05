@@ -76,7 +76,9 @@ tr:hover td{background:var(--accent-bg)}
 .modo-itens-cards label{flex:1;min-width:240px;display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 12px;border:2px solid var(--border);border-radius:6px;font-size:13px}
 .modo-itens-cards label.active{border-color:var(--accent);background:var(--accent-bg)}
 .compra-itens-table{overflow-x:auto;-webkit-overflow-scrolling:touch}
-.compra-itens-table table{min-width:560px}
+.compra-itens-table table{min-width:680px;width:100%}
+.compra-itens-table th:first-child,.compra-itens-table td:first-child{min-width:240px}
+.compra-itens-table input{width:100%;min-width:0;box-sizing:border-box}
 .modal h3{font-family:'Playfair Display',serif;font-size:20px;color:var(--accent);margin-bottom:16px}
 .modal .form-group{margin-bottom:12px}
 .modal .form-group input,.modal .form-group select,.modal .form-group textarea{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius);background:var(--bg);font-size:14px}
@@ -3158,6 +3160,9 @@ window.abrirOrganizacao = function(id){
       ehNovo: item ? (!item.localizacao && (item.secao==='Não definida' || !item.secao)) : false
     };
   });
+  // Inicializa arrays de tipos/seções extras (cadastrados durante a organização)
+  S.organizandoTiposExtra = [];
+  S.organizandoSecoesExtra = [];
   S.modal = 'organizarCompra';
   render();
 };
@@ -3169,6 +3174,12 @@ function mOrganizarCompra(){
   var novos = linhas.filter(function(l){return l.ehNovo});
   var existentes = linhas.filter(function(l){return !l.ehNovo});
 
+  // Tipos e seções disponíveis: combina constantes + items existentes + valores adicionados nesta sessão
+  var tiposExtra = S.organizandoTiposExtra || [];
+  var secoesExtra = S.organizandoSecoesExtra || [];
+  var tipos = uniqSorted(getTiposItem().concat(tiposExtra));
+  var secoes = uniqSorted(getSecoesItem().concat(secoesExtra));
+
   var html = '<div class="modal-overlay"'+MO()+'><div class="modal modal-xwide"><h3>📍 Organizar Compra #'+c.id+'</h3>';
   html += '<div style="background:var(--bg2);padding:10px;border-radius:8px;margin-bottom:14px;font-size:13px"><strong>'+(fornec?esc(fornec.nome):'(sem fornecedor)')+'</strong> • '+fmtDate(c.dataPedido)+' • R$ '+(c.total||0).toFixed(2).replace('.',',')+'</div>';
   html += '<p style="font-size:13px;color:var(--text2);margin-bottom:14px">Defina onde cada item novo será guardado fisicamente. Itens já cadastrados antes mantêm sua organização original.</p>';
@@ -3176,31 +3187,47 @@ function mOrganizarCompra(){
   // Cabeçalho da tabela de novos
   if(novos.length){
     html += '<h4 style="margin:14px 0 8px;color:var(--accent);font-size:14px">🆕 Itens novos a organizar ('+novos.length+')</h4>';
-    html += '<div class="compra-itens-table"><table style="min-width:560px"><thead><tr><th>Item</th><th style="width:130px">Tipo</th><th style="width:160px">Seção</th><th style="width:160px">Localização</th></tr></thead><tbody>';
+
+    // Barra de ações: cadastrar novo tipo/seção + aplicar a todos
+    html += '<div style="background:#FEF5E7;border-left:3px solid #F39C12;padding:10px;border-radius:6px;margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px">';
+    html += '<span style="font-weight:600;margin-right:4px">⚡ Atalhos:</span>';
+    html += '<button class="btn btn-sm btn-info" onclick="cadastrarNovoTipoOrg()">+ Novo Tipo</button>';
+    html += '<button class="btn btn-sm btn-info" onclick="cadastrarNovaSecaoOrg()">+ Nova Seção</button>';
+    html += '<span style="margin-left:8px;color:var(--text2)">Aplicar a todos:</span>';
+    html += '<select id="orgBulkTipo" style="min-width:110px"><option value="">— Tipo —</option>';
+    tipos.forEach(function(t){html += '<option value="'+esc(t)+'">'+esc(t)+'</option>'});
+    html += '</select>';
+    html += '<select id="orgBulkSecao" style="min-width:140px"><option value="">— Seção —</option>';
+    secoes.forEach(function(s){html += '<option value="'+esc(s)+'">'+esc(s)+'</option>'});
+    html += '</select>';
+    html += '<input id="orgBulkLoc" type="text" placeholder="Localização" style="min-width:140px">';
+    html += '<button class="btn btn-sm btn-success" onclick="aplicarOrgEmTodos()">Aplicar</button>';
+    html += '</div>';
+
+    html += '<div class="compra-itens-table"><table style="min-width:680px"><thead><tr><th>Item</th><th style="width:140px">Tipo</th><th style="width:170px">Seção</th><th style="width:170px">Localização</th></tr></thead><tbody>';
     linhas.forEach(function(l, idx){
       if(!l.ehNovo) return;
       var nome = l.item ? l.item.nome : (l.compraItem.descricao||'?');
-      // Tipos disponíveis (pega de TIPOS se existir, senão um default)
-      var tipos = (typeof TIPOS !== 'undefined' && TIPOS) ? TIPOS : ['Item','Pó','Erva','Folha','Raiz','Casca'];
-      var secoes = (typeof SECOES !== 'undefined' && SECOES) ? SECOES : getSecoes();
       html += '<tr>';
       html += '<td><strong>'+esc(nome)+'</strong><div style="font-size:11px;color:var(--text3)">Qtd: '+l.compraItem.quantidade+' '+esc(l.compraItem.unidadeMedida||'un')+'</div></td>';
-      // Tipo (select com opção "outro")
+      // Tipo
       html += '<td><select onchange="atualizarOrganizacao('+idx+',\'novoTipo\',this.value)" style="width:100%">';
-      tipos.forEach(function(t){
+      var tiposLinha = tipos.slice();
+      if(l.novoTipo && tiposLinha.indexOf(l.novoTipo)<0) tiposLinha.unshift(l.novoTipo);
+      tiposLinha.forEach(function(t){
         html += '<option value="'+esc(t)+'"'+(l.novoTipo===t?' selected':'')+'>'+esc(t)+'</option>';
       });
       html += '</select></td>';
-      // Seção (select com opção "outro")
+      // Seção
       html += '<td><select onchange="atualizarOrganizacao('+idx+',\'novaSecao\',this.value)" style="width:100%">';
-      var todasSecoes = secoes && secoes.length ? secoes.slice() : ['Escritório do Bàbá','Não definida'];
-      if(l.novaSecao && todasSecoes.indexOf(l.novaSecao)<0) todasSecoes.unshift(l.novaSecao);
-      todasSecoes.forEach(function(s){
+      var secoesLinha = secoes.slice();
+      if(l.novaSecao && secoesLinha.indexOf(l.novaSecao)<0) secoesLinha.unshift(l.novaSecao);
+      secoesLinha.forEach(function(s){
         html += '<option value="'+esc(s)+'"'+(l.novaSecao===s?' selected':'')+'>'+esc(s)+'</option>';
       });
       html += '</select></td>';
       // Localização (texto livre)
-      html += '<td><input type="text" value="'+esc(l.novaLocalizacao||'')+'" oninput="atualizarOrganizacao('+idx+',\'novaLocalizacao\',this.value)" placeholder="Ex: Armário 1, Prateleira 3" style="width:100%"></td>';
+      html += '<td><input type="text" value="'+esc(l.novaLocalizacao||'')+'" oninput="atualizarOrganizacao('+idx+',\'novaLocalizacao\',this.value)" placeholder="Ex: Armário 1, Prateleira 3"></td>';
       html += '</tr>';
     });
     html += '</tbody></table></div>';
@@ -3227,6 +3254,60 @@ function mOrganizarCompra(){
 window.atualizarOrganizacao = function(idx, campo, valor){
   if(!S.organizandoItens || !S.organizandoItens[idx]) return;
   S.organizandoItens[idx][campo] = valor;
+};
+
+// Cadastra novo Tipo durante a organização (válido só para esta sessão até o save)
+window.cadastrarNovoTipoOrg = function(){
+  var nome = prompt('Nome do novo tipo (ex: "Sabonete", "Vela", "Água perfumada"):','');
+  if(!nome) return;
+  nome = nome.trim();
+  if(nome.length<2) return toast('Nome muito curto','error');
+  // Verifica duplicata (case insensitive)
+  var existentes = uniqSorted(getTiposItem().concat(S.organizandoTiposExtra||[]));
+  if(existentes.some(function(t){return t.toLowerCase()===nome.toLowerCase()})){
+    return toast('Já existe um tipo com este nome','error');
+  }
+  S.organizandoTiposExtra = S.organizandoTiposExtra || [];
+  S.organizandoTiposExtra.push(nome);
+  toast('Tipo "'+nome+'" disponível para uso');
+  render();
+};
+
+// Cadastra nova Seção durante a organização
+window.cadastrarNovaSecaoOrg = function(){
+  var nome = prompt('Nome da nova seção (ex: "Despensa", "Sala da frente", "Atrás do altar"):','');
+  if(!nome) return;
+  nome = nome.trim();
+  if(nome.length<2) return toast('Nome muito curto','error');
+  var existentes = uniqSorted(getSecoesItem().concat(S.organizandoSecoesExtra||[]));
+  if(existentes.some(function(s){return s.toLowerCase()===nome.toLowerCase()})){
+    return toast('Já existe uma seção com este nome','error');
+  }
+  S.organizandoSecoesExtra = S.organizandoSecoesExtra || [];
+  S.organizandoSecoesExtra.push(nome);
+  toast('Seção "'+nome+'" disponível para uso');
+  render();
+};
+
+// Aplica tipo/seção/localização nos selects bulk a TODOS os itens novos da tabela
+window.aplicarOrgEmTodos = function(){
+  var tipoSel = document.getElementById('orgBulkTipo');
+  var secaoSel = document.getElementById('orgBulkSecao');
+  var locInp = document.getElementById('orgBulkLoc');
+  var tipo = tipoSel ? tipoSel.value : '';
+  var secao = secaoSel ? secaoSel.value : '';
+  var loc = locInp ? locInp.value.trim() : '';
+  if(!tipo && !secao && !loc) return toast('Preencha ao menos um campo para aplicar','error');
+  var n = 0;
+  (S.organizandoItens||[]).forEach(function(l){
+    if(!l.ehNovo) return;
+    if(tipo) l.novoTipo = tipo;
+    if(secao) l.novaSecao = secao;
+    if(loc) l.novaLocalizacao = loc;
+    n++;
+  });
+  toast('Aplicado em '+n+' iten(s)');
+  render();
 };
 
 window.confirmarOrganizacao = async function(){
@@ -3271,6 +3352,8 @@ window.confirmarOrganizacao = async function(){
   toast(alterados+' item(ns) organizados! Compra finalizada.');
   S.organizando = null;
   S.organizandoItens = [];
+  S.organizandoTiposExtra = [];
+  S.organizandoSecoesExtra = [];
   closeModal();
 };
 
