@@ -70,13 +70,19 @@ tr:hover td{background:var(--accent-bg)}
 .empty-state{padding:40px;text-align:center;color:var(--text3)}
 .modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(44,42,37,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
 .modal{background:var(--bg3);border-radius:var(--radius-lg);padding:24px;width:100%;max-width:520px;box-shadow:var(--shadow-lg);max-height:90vh;overflow-y:auto}
-.modal-wide{max-width:680px}
+.modal-wide{max-width:min(680px,calc(100vw - 32px))}
+.modal-xwide{max-width:min(880px,calc(100vw - 32px))}
+.modo-itens-cards{display:flex;gap:12px;flex-wrap:wrap}
+.modo-itens-cards label{flex:1;min-width:240px;display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 12px;border:2px solid var(--border);border-radius:6px;font-size:13px}
+.modo-itens-cards label.active{border-color:var(--accent);background:var(--accent-bg)}
+.compra-itens-table{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.compra-itens-table table{min-width:560px}
 .modal h3{font-family:'Playfair Display',serif;font-size:20px;color:var(--accent);margin-bottom:16px}
 .modal .form-group{margin-bottom:12px}
 .modal .form-group input,.modal .form-group select,.modal .form-group textarea{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:var(--radius);background:var(--bg);font-size:14px}
 .modal .form-group textarea{resize:vertical;min-height:60px;font-family:inherit}
 .modal .form-group input:focus,.modal .form-group select:focus,.modal .form-group textarea:focus{outline:none;border-color:var(--accent)}
-.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px;flex-wrap:wrap}
 .report-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;margin-bottom:16px}
 .report-card{background:var(--bg3);border-radius:var(--radius-lg);padding:16px;box-shadow:var(--shadow);border-left:4px solid var(--accent)}
 .report-card .rc-label{font-size:12px;color:var(--text2);font-weight:500;margin-bottom:4px}
@@ -179,7 +185,7 @@ body *{visibility:hidden}
 #eboSheet .ebo-foto-img{width:100%;height:100%;object-fit:cover;filter:grayscale(100%) contrast(1.05);display:block}
 @page{size:A4 landscape;margin:0}
 }
-@media(max-width:600px){.header{flex-direction:column;gap:8px;text-align:center}.search-bar{flex-direction:column}.tab{padding:8px 10px;font-size:12px}.report-cards{grid-template-columns:1fr 1fr}.modal{padding:20px 16px}.bar-chart{height:160px}.kanban-grid{grid-template-columns:1fr}.form-group-row{grid-template-columns:1fr}.detail-grid{grid-template-columns:1fr}.quick-bar{justify-content:center}}
+@media(max-width:600px){.header{flex-direction:column;gap:8px;text-align:center}.search-bar{flex-direction:column}.tab{padding:8px 10px;font-size:12px}.report-cards{grid-template-columns:1fr 1fr}.modal{padding:16px 12px}.modal-overlay{padding:8px}.bar-chart{height:160px}.kanban-grid{grid-template-columns:1fr}.form-group-row{grid-template-columns:1fr}.detail-grid{grid-template-columns:1fr}.quick-bar{justify-content:center}.modo-itens-cards label{min-width:100%}}
 </style>
 </head>
 <body>
@@ -987,6 +993,7 @@ var STATUS_COMPRA=[
   {key:'pedido_feito',  label:'Pedido Feito',  color:'#3498DB'},
   {key:'pago',          label:'Pago',          color:'#9B59B6'},
   {key:'em_transito',   label:'Em Trânsito',   color:'#F39C12'},
+  {key:'organizar',     label:'Organizar',     color:'#E67E22'},
   {key:'recebido',      label:'Recebido',      color:'#27AE60'},
   {key:'cancelado',     label:'Cancelado',     color:'#C0392B'}
 ];
@@ -1153,6 +1160,50 @@ try{
   return false;
 }
 }
+// Compara dois objetos e retorna string resumida com campos alterados
+// Retorna '' se nada mudou. Limita a 200 chars.
+function diffRegistros(antigo, novo, labelMap, camposSensiveis){
+  if(!antigo || !novo) return '';
+  labelMap = labelMap || {};
+  camposSensiveis = camposSensiveis || ['observacoes','obs','descricao','prescricao','description'];
+  var mudancas = [];
+  Object.keys(novo).forEach(function(k){
+    // Pula chaves auxiliares
+    if(['id','criadoEm','criadoPor','atualizadoEm','atualizadoPor','authUser'].indexOf(k)>=0) return;
+    var va = antigo[k];
+    var vn = novo[k];
+    // Normaliza para comparação
+    var sa = (va===null||va===undefined)?'':String(va).trim();
+    var sn = (vn===null||vn===undefined)?'':String(vn).trim();
+    if(sa===sn) return;
+    var label = labelMap[k] || k;
+    if(camposSensiveis.indexOf(k)>=0){
+      mudancas.push(label+' alterad'+(label.match(/ção$|dade$|ar$/i)?'a':'o'));
+    } else {
+      // Trunca valores muito longos
+      var dispA = sa.length>30 ? sa.substring(0,27)+'...' : sa;
+      var dispN = sn.length>30 ? sn.substring(0,27)+'...' : sn;
+      mudancas.push(label+': "'+(dispA||'∅')+'" → "'+(dispN||'∅')+'"');
+    }
+  });
+  if(!mudancas.length) return '';
+  var resultado = mudancas.join('; ');
+  if(resultado.length>200){
+    // Tenta mostrar só algumas com indicador de "+ N"
+    var n = mudancas.length;
+    var primeiras = [];
+    var total = 0;
+    for(var i=0;i<mudancas.length;i++){
+      if(total + mudancas[i].length + 2 > 180) break;
+      primeiras.push(mudancas[i]);
+      total += mudancas[i].length + 2;
+    }
+    if(primeiras.length<n) resultado = primeiras.join('; ')+' (+ '+(n-primeiras.length)+' campo(s))';
+    if(resultado.length>200) resultado = resultado.substring(0,197)+'...';
+  }
+  return resultado;
+}
+
 // Add history entry
 async function addHistDB(action){
 var username=S.currentUser?S.currentUser.username:'sys';
@@ -2262,11 +2313,16 @@ function renderCompraCard(c, status){
   // Ações
   if(canEdit){
     h += '<div class="kc-actions">';
-    if(idxStatus>0 && status.key!=='cancelado') h += '<button class="btn btn-sm btn-outline" onclick="moverCompra('+c.id+',-1)" title="Voltar status">◀</button>';
-    if(idxStatus<3 && status.key!=='cancelado') h += '<button class="btn btn-sm btn-success" onclick="moverCompra('+c.id+',1)">Avançar</button>';
+    // Voltar status (exceto pedido_feito e cancelado)
+    if(idxStatus>0 && status.key!=='cancelado' && status.key!=='recebido') h += '<button class="btn btn-sm btn-outline" onclick="moverCompra('+c.id+',-1)" title="Voltar status">◀</button>';
+    // Avançar (só nos primeiros 3 status: pedido_feito → pago → em_transito; daí em diante tem botão dedicado)
+    if(['pedido_feito','pago'].indexOf(status.key)>=0) h += '<button class="btn btn-sm btn-success" onclick="moverCompra('+c.id+',1)">Avançar</button>';
     if(status.key==='em_transito') h += '<button class="btn btn-sm btn-info" onclick="abrirRecebimento('+c.id+')">📦 Receber</button>';
+    if(status.key==='organizar') h += '<button class="btn btn-sm" style="background:#E67E22;color:#fff" onclick="abrirOrganizacao('+c.id+')">📍 Definir locais</button>';
     h += '<button class="btn btn-sm btn-outline" onclick="abrirCompra('+c.id+')">Ver</button>';
     if(status.key==='recebido' || status.key==='cancelado') h += '<button class="btn btn-sm" style="background:#7F8C8D;color:#fff" onclick="arquivarCompra('+c.id+')" title="Tirar do kanban">📦 Finalizar</button>';
+    // Cancelar (só em status iniciais)
+    if(['pedido_feito','pago','em_transito'].indexOf(status.key)>=0) h += '<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="cancelarCompra('+c.id+')" title="Cancelar compra">⊘</button>';
     if(hasRole(['admin'])) h += '<button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="excluirCompra('+c.id+')">×</button>';
     h += '</div>';
   }
@@ -2309,6 +2365,19 @@ window.moverCompra = async function(id, delta){
     addHistDB('Compra #'+id+' → '+novo.label);
     toast('Status atualizado: '+novo.label);
   } else toast('Falha ao mover','error');
+  render();
+};
+
+window.cancelarCompra = async function(id){
+  var c = (S.compras||[]).find(function(x){return x.id===id}); if(!c) return;
+  if(!confirm('Cancelar a compra #'+id+'?\n\nEla será movida para a coluna Cancelado, mas pode ser reativada se preciso (não exclui dados).')) return;
+  var antigo = c.status;
+  c.status = 'cancelado';
+  var ok = await saveRecord('compras', c.id, _stampUpdate(compraToDB(c)));
+  if(ok){
+    addHistDB('Compra #'+id+' cancelada (antes: '+antigo+')');
+    toast('Compra cancelada');
+  } else { c.status = antigo; toast('Falha ao cancelar','error') }
   render();
 };
 
@@ -2417,7 +2486,7 @@ function mNovaCompra(){
   c.subtotal = subtotal;
   c.total = subtotal + (parseFloat(c.valorFrete)||0) - (parseFloat(c.valorDesconto)||0);
 
-  var html = '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide" style="max-width:880px"><h3>'+titulo+'</h3>';
+  var html = '<div class="modal-overlay"'+MO()+'><div class="modal modal-xwide"><h3>'+titulo+'</h3>';
 
   // Botões de captura (só na criação)
   if(!isEdit){
@@ -2464,14 +2533,14 @@ function mNovaCompra(){
 
   // === Modo de itens ===
   html += '<h4 style="margin:14px 0 8px;color:var(--accent);font-size:14px">📦 Itens da compra</h4>';
-  html += '<div class="form-group"><label>Modo de cadastro</label><div style="display:flex;gap:12px;flex-wrap:wrap">';
-  html += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;border:2px solid '+(c.modoItens==='detalhado'?'var(--accent)':'var(--border)')+';border-radius:6px"><input type="radio" name="modoItens" value="detalhado" '+(c.modoItens==='detalhado'?'checked':'')+' onchange="setModoItens(\'detalhado\')"> <strong>Detalhado</strong> <span style="font-size:11px;color:var(--text2)">(cada item separado, atualiza estoque)</span></label>';
-  html += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;border:2px solid '+(c.modoItens==='agrupado'?'var(--accent)':'var(--border)')+';border-radius:6px"><input type="radio" name="modoItens" value="agrupado" '+(c.modoItens==='agrupado'?'checked':'')+' onchange="setModoItens(\'agrupado\')"> <strong>Agrupado</strong> <span style="font-size:11px;color:var(--text2)">(1 linha "Diversos", só registra gasto)</span></label>';
+  html += '<div class="form-group"><label>Modo de cadastro</label><div class="modo-itens-cards">';
+  html += '<label class="'+(c.modoItens==='detalhado'?'active':'')+'"><input type="radio" name="modoItens" value="detalhado" '+(c.modoItens==='detalhado'?'checked':'')+' onchange="setModoItens(\'detalhado\')"> <span><strong>Detalhado</strong> <span style="font-size:11px;color:var(--text2);display:block">cada item separado, atualiza estoque</span></span></label>';
+  html += '<label class="'+(c.modoItens==='agrupado'?'active':'')+'"><input type="radio" name="modoItens" value="agrupado" '+(c.modoItens==='agrupado'?'checked':'')+' onchange="setModoItens(\'agrupado\')"> <span><strong>Agrupado</strong> <span style="font-size:11px;color:var(--text2);display:block">1 linha "Diversos", só registra gasto</span></span></label>';
   html += '</div></div>';
 
   // Tabela de itens
   if(itens.length){
-    html += '<div class="table-wrap" style="margin-bottom:8px"><div class="table-scroll"><table><thead><tr><th>Item</th><th style="width:80px">Qtd</th><th style="width:80px">Un.</th><th style="width:110px">R$ Unit.</th><th style="width:110px">R$ Total</th><th style="width:40px"></th></tr></thead><tbody>';
+    html += '<div class="compra-itens-table" style="margin-bottom:8px"><table><thead><tr><th>Item</th><th style="width:80px">Qtd</th><th style="width:80px">Un.</th><th style="width:110px">R$ Unit.</th><th style="width:110px">R$ Total</th><th style="width:40px"></th></tr></thead><tbody>';
     itens.forEach(function(ci, idx){
       html += '<tr>';
       if(c.modoItens==='agrupado'){
@@ -2494,7 +2563,7 @@ function mNovaCompra(){
       html += '<td><button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="removerItemCompra('+idx+')" title="Remover">×</button></td>';
       html += '</tr>';
     });
-    html += '</tbody></table></div></div>';
+    html += '</tbody></table></div>';
   } else {
     html += '<div class="empty-state" style="padding:20px;background:var(--bg2);border-radius:8px">Nenhum item adicionado.</div>';
   }
@@ -2961,7 +3030,7 @@ window.cadastrarFornecedorDoQR = function(){
 };
 
 function mLeitorQR(){
-  return '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide" style="max-width:520px"><h3>📷 Ler QR Code do cupom</h3>'+
+  return '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide"><h3>📷 Ler QR Code do cupom</h3>'+
     '<p style="font-size:13px;color:var(--text2);margin-bottom:12px">Aponte a câmera para o QR Code do cupom fiscal (NFC-e). O sistema vai capturar automaticamente os dados básicos: CNPJ, valor e data.</p>'+
     '<div id="qrReader" style="width:100%;min-height:280px;background:#000;border-radius:8px;overflow:hidden"></div>'+
     '<div style="margin-top:12px"><label style="font-size:12px;color:var(--text2)">Ou cole a URL/chave manualmente:</label>'+
@@ -2975,13 +3044,13 @@ function mReceberCompra(){
   var c = S.compraRecebimento || {};
   var itens = S.compraRecebimentoItens || [];
   var fornec = getFornecedor(c.fornecedorId);
-  var html = '<div class="modal-overlay"'+MO()+'><div class="modal modal-wide" style="max-width:760px"><h3>📦 Conferir Recebimento — Compra #'+c.id+'</h3>';
+  var html = '<div class="modal-overlay"'+MO()+'><div class="modal modal-xwide"><h3>📦 Conferir Recebimento — Compra #'+c.id+'</h3>';
   html += '<div style="background:var(--bg2);padding:10px;border-radius:8px;margin-bottom:14px;font-size:13px"><strong>'+(fornec?esc(fornec.nome):'(sem fornecedor)')+'</strong> • '+fmtDate(c.dataPedido)+' • R$ '+(c.total||0).toFixed(2).replace('.',',')+'</div>';
   html += '<p style="font-size:13px;color:var(--text2);margin-bottom:10px">Confira a quantidade efetivamente recebida de cada item. Pode receber tudo, parcial ou indicar problemas. Ao confirmar, o estoque será <strong>atualizado automaticamente</strong>.</p>';
   if(c.modoItens==='agrupado'){
     html += '<div style="background:#FEF5E7;border-left:3px solid #F39C12;padding:10px;border-radius:6px;margin-bottom:10px;font-size:12px">⚠ Esta compra está em modo <strong>Agrupado</strong> — não há itens detalhados, então o estoque não será afetado. Apenas marca como recebido.</div>';
   }
-  html += '<div class="table-wrap"><div class="table-scroll"><table><thead><tr><th>Item</th><th style="width:110px">Pedido</th><th style="width:140px">Recebido</th></tr></thead><tbody>';
+  html += '<div class="compra-itens-table"><table style="min-width:480px"><thead><tr><th>Item</th><th style="width:110px">Pedido</th><th style="width:140px">Recebido</th></tr></thead><tbody>';
   itens.forEach(function(ci, idx){
     var item = ci.itemId ? S.items.find(function(i){return i.id===ci.itemId}) : null;
     var nomeExib = item ? item.nome : ci.descricao;
@@ -2992,7 +3061,7 @@ function mReceberCompra(){
     html += '<td><input type="number" step="any" min="0" value="'+(ci.qtdRecebida||0)+'" oninput="atualizarRecebimento('+idx+',this.value)" style="width:100%"></td>';
     html += '</tr>';
   });
-  html += '</tbody></table></div></div>';
+  html += '</tbody></table></div>';
   html += '<div class="modal-actions" style="margin-top:14px"><button class="btn btn-outline" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="confirmarRecebimento()">✓ Confirmar recebimento</button></div>';
   html += '</div></div>';
   return html;
@@ -3046,8 +3115,8 @@ window.confirmarRecebimento = async function(){
     }
   }
 
-  // Marca compra como recebida
-  c.status = 'recebido';
+  // Move para "Organizar" (próxima etapa: definir local físico de cada item novo)
+  c.status = 'organizar';
   c.dataRecebimento = today();
   var dbCompra = _stampUpdate(compraToDB(c));
   await saveRecord('compras', c.id, dbCompra);
@@ -3055,10 +3124,153 @@ window.confirmarRecebimento = async function(){
   var idxC = S.compras.findIndex(function(x){return x.id===c.id});
   if(idxC>=0) Object.assign(S.compras[idxC], c, {atualizadoEm:dbCompra.atualizado_em,atualizadoPor:dbCompra.atualizado_por});
 
-  addHistDB('Recebimento confirmado: Compra #'+c.id+(c.modoItens==='detalhado'?' (estoque atualizado)':''));
-  toast('Recebimento confirmado! '+(c.modoItens==='detalhado'?'Estoque atualizado.':''));
+  addHistDB('Recebimento confirmado: Compra #'+c.id+(c.modoItens==='detalhado'?' (estoque atualizado)':'')+' → aguardando organização');
+  toast('Recebimento confirmado! Agora defina onde cada item novo será guardado.');
   S.compraRecebimento = null;
   S.compraRecebimentoItens = [];
+  closeModal();
+  // Abre direto a tela de organização
+  setTimeout(function(){ if(window.abrirOrganizacao) window.abrirOrganizacao(c.id) }, 300);
+};
+
+// ==================== ORGANIZAÇÃO PÓS-RECEBIMENTO ====================
+// Nesta etapa, o usuário define a localização física dos itens novos
+// (criados durante o cadastro da compra) que ainda não têm seção/localização.
+
+window.abrirOrganizacao = function(id){
+  var c = (S.compras||[]).find(function(x){return x.id===id}); if(!c) return;
+  if(c.status !== 'organizar' && c.status !== 'recebido'){
+    toast('Esta compra ainda não foi recebida. Confirme o recebimento primeiro.','error');
+    return;
+  }
+  S.organizando = JSON.parse(JSON.stringify(c));
+  // Pega os itens da compra e enriquece com referência ao item do estoque
+  S.organizandoItens = getItensDaCompra(id).map(function(ci){
+    var item = ci.itemId ? S.items.find(function(i){return i.id===ci.itemId}) : null;
+    return {
+      compraItem: ci,
+      item: item,
+      // Estado editável
+      novaSecao: item ? item.secao : 'Não definida',
+      novaLocalizacao: item ? (item.localizacao||'') : '',
+      novoTipo: item ? item.tipo : 'Item',
+      // Marca como "novo" se foi criado junto da compra (sem localização e sem tipo definido)
+      ehNovo: item ? (!item.localizacao && (item.secao==='Não definida' || !item.secao)) : false
+    };
+  });
+  S.modal = 'organizarCompra';
+  render();
+};
+
+function mOrganizarCompra(){
+  var c = S.organizando || {};
+  var linhas = S.organizandoItens || [];
+  var fornec = getFornecedor(c.fornecedorId);
+  var novos = linhas.filter(function(l){return l.ehNovo});
+  var existentes = linhas.filter(function(l){return !l.ehNovo});
+
+  var html = '<div class="modal-overlay"'+MO()+'><div class="modal modal-xwide"><h3>📍 Organizar Compra #'+c.id+'</h3>';
+  html += '<div style="background:var(--bg2);padding:10px;border-radius:8px;margin-bottom:14px;font-size:13px"><strong>'+(fornec?esc(fornec.nome):'(sem fornecedor)')+'</strong> • '+fmtDate(c.dataPedido)+' • R$ '+(c.total||0).toFixed(2).replace('.',',')+'</div>';
+  html += '<p style="font-size:13px;color:var(--text2);margin-bottom:14px">Defina onde cada item novo será guardado fisicamente. Itens já cadastrados antes mantêm sua organização original.</p>';
+
+  // Cabeçalho da tabela de novos
+  if(novos.length){
+    html += '<h4 style="margin:14px 0 8px;color:var(--accent);font-size:14px">🆕 Itens novos a organizar ('+novos.length+')</h4>';
+    html += '<div class="compra-itens-table"><table style="min-width:560px"><thead><tr><th>Item</th><th style="width:130px">Tipo</th><th style="width:160px">Seção</th><th style="width:160px">Localização</th></tr></thead><tbody>';
+    linhas.forEach(function(l, idx){
+      if(!l.ehNovo) return;
+      var nome = l.item ? l.item.nome : (l.compraItem.descricao||'?');
+      // Tipos disponíveis (pega de TIPOS se existir, senão um default)
+      var tipos = (typeof TIPOS !== 'undefined' && TIPOS) ? TIPOS : ['Item','Pó','Erva','Folha','Raiz','Casca'];
+      var secoes = (typeof SECOES !== 'undefined' && SECOES) ? SECOES : getSecoes();
+      html += '<tr>';
+      html += '<td><strong>'+esc(nome)+'</strong><div style="font-size:11px;color:var(--text3)">Qtd: '+l.compraItem.quantidade+' '+esc(l.compraItem.unidadeMedida||'un')+'</div></td>';
+      // Tipo (select com opção "outro")
+      html += '<td><select onchange="atualizarOrganizacao('+idx+',\'novoTipo\',this.value)" style="width:100%">';
+      tipos.forEach(function(t){
+        html += '<option value="'+esc(t)+'"'+(l.novoTipo===t?' selected':'')+'>'+esc(t)+'</option>';
+      });
+      html += '</select></td>';
+      // Seção (select com opção "outro")
+      html += '<td><select onchange="atualizarOrganizacao('+idx+',\'novaSecao\',this.value)" style="width:100%">';
+      var todasSecoes = secoes && secoes.length ? secoes.slice() : ['Escritório do Bàbá','Não definida'];
+      if(l.novaSecao && todasSecoes.indexOf(l.novaSecao)<0) todasSecoes.unshift(l.novaSecao);
+      todasSecoes.forEach(function(s){
+        html += '<option value="'+esc(s)+'"'+(l.novaSecao===s?' selected':'')+'>'+esc(s)+'</option>';
+      });
+      html += '</select></td>';
+      // Localização (texto livre)
+      html += '<td><input type="text" value="'+esc(l.novaLocalizacao||'')+'" oninput="atualizarOrganizacao('+idx+',\'novaLocalizacao\',this.value)" placeholder="Ex: Armário 1, Prateleira 3" style="width:100%"></td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+  } else {
+    html += '<div class="empty-state" style="padding:14px;background:var(--bg2);border-radius:8px;margin-bottom:14px">Não há itens novos para organizar — todos já estavam cadastrados antes da compra.</div>';
+  }
+
+  // Itens existentes (só info)
+  if(existentes.length){
+    html += '<details style="margin-top:14px"><summary style="cursor:pointer;font-size:14px;color:var(--text2)">✓ Itens já organizados anteriormente ('+existentes.length+')</summary>';
+    html += '<div class="compra-itens-table" style="margin-top:8px"><table style="min-width:480px"><thead><tr><th>Item</th><th>Tipo</th><th>Seção</th><th>Localização</th></tr></thead><tbody>';
+    existentes.forEach(function(l){
+      var nome = l.item ? l.item.nome : (l.compraItem.descricao||'?');
+      html += '<tr style="opacity:.7"><td>'+esc(nome)+'</td><td>'+esc(l.item.tipo||'—')+'</td><td>'+esc(l.item.secao||'—')+'</td><td>'+esc(l.item.localizacao||'—')+'</td></tr>';
+    });
+    html += '</tbody></table></div></details>';
+  }
+
+  html += '<div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Adiar</button><button class="btn btn-primary" onclick="confirmarOrganizacao()">✓ Confirmar e finalizar compra</button></div>';
+  html += '</div></div>';
+  return html;
+}
+
+window.atualizarOrganizacao = function(idx, campo, valor){
+  if(!S.organizandoItens || !S.organizandoItens[idx]) return;
+  S.organizandoItens[idx][campo] = valor;
+};
+
+window.confirmarOrganizacao = async function(){
+  var c = S.organizando;
+  var linhas = S.organizandoItens || [];
+  if(!c) return;
+  var novos = linhas.filter(function(l){return l.ehNovo && l.item});
+  // Valida: todos os novos precisam ter pelo menos seção definida
+  var faltando = novos.filter(function(l){return !l.novaSecao || l.novaSecao==='Não definida'});
+  if(faltando.length){
+    if(!confirm(faltando.length+' item(ns) ainda estão com seção "Não definida". Confirmar mesmo assim?')) return;
+  }
+
+  // Atualiza cada item novo no banco
+  var alterados = 0;
+  for(var i=0;i<novos.length;i++){
+    var l = novos[i];
+    var item = l.item;
+    var antes = {tipo:item.tipo, secao:item.secao, localizacao:item.localizacao};
+    item.tipo = l.novoTipo || 'Item';
+    item.secao = l.novaSecao || 'Não definida';
+    item.localizacao = l.novaLocalizacao || '';
+    var dbItem = _stampUpdate(itemToDB(item));
+    var ok = await saveRecord('items', item.id, dbItem);
+    if(ok){
+      alterados++;
+      addHistDB('📍 Item organizado: '+item.nome+' → '+item.secao+(item.localizacao?' / '+item.localizacao:''));
+    } else {
+      // Reverte em memória se falhou
+      item.tipo = antes.tipo; item.secao = antes.secao; item.localizacao = antes.localizacao;
+    }
+  }
+
+  // Move compra para "Recebido" (status final)
+  c.status = 'recebido';
+  var dbCompra = _stampUpdate(compraToDB(c));
+  await saveRecord('compras', c.id, dbCompra);
+  var idxC = S.compras.findIndex(function(x){return x.id===c.id});
+  if(idxC>=0) Object.assign(S.compras[idxC], c, {atualizadoEm:dbCompra.atualizado_em,atualizadoPor:dbCompra.atualizado_por});
+
+  addHistDB('Compra #'+c.id+' organizada e finalizada ('+alterados+' item(ns) localizados)');
+  toast(alterados+' item(ns) organizados! Compra finalizada.');
+  S.organizando = null;
+  S.organizandoItens = [];
   closeModal();
 };
 
@@ -3117,11 +3329,13 @@ window.salvarFornecedor = async function(){
     observacoes: document.getElementById('fObs').value.trim()
   };
   if(S.editFornecedor){
+    var antesF = JSON.parse(JSON.stringify(S.editFornecedor));
     var dbPayload = _stampUpdate(fornecedorToDB(d));
     var ok = await saveRecord('fornecedores', S.editFornecedor.id, dbPayload);
     if(ok){
       Object.assign(S.editFornecedor, d, {atualizadoEm:dbPayload.atualizado_em, atualizadoPor:dbPayload.atualizado_por});
-      addHistDB('Fornecedor editado: '+nome);
+      var dif = diffRegistros(antesF, d, {nome:'Nome',tipo:'Tipo',cnpjCpf:'CNPJ/CPF',telefone:'Telefone',email:'Email',endereco:'Endereço',especialidade:'Especialidade',avaliacao:'Avaliação',ativo:'Ativo',observacoes:'Observações'});
+      addHistDB('Fornecedor editado: '+nome+(dif?' — '+dif:''));
       toast('Fornecedor atualizado!');
     } else return toast('Falha ao salvar','error');
   } else {
@@ -3642,6 +3856,7 @@ if(m==='editFornecedor')return mEditFornecedor();
 if(m==='novaCompra')return mNovaCompra();
 if(m==='leitorQR')return mLeitorQR();
 if(m==='receberCompra')return mReceberCompra();
+if(m==='organizarCompra')return mOrganizarCompra();
 if(m==='addCrediario')return mAddCrediario();if(m==='pagCrediario')return mPagCrediario();
 if(m==='addLivro'||m==='editLivro')return mLivro();
 return ''}
@@ -4014,7 +4229,7 @@ addHistDB('Rejeitou exclusão: '+(p.registro_snapshot&&p.registro_snapshot.nome|
 toast('Pedido rejeitado');
 closeModal()};
 
-window.saveItem=async function(){var n=document.getElementById('mNome').value.trim();var err=validateText(n,2,300,'Nome do item');if(err)return toast(err,'error');var tipo=lerValorOutro('mTipo');var secao=lerValorOutro('mSecao');if(!tipo)return toast('Informe o tipo (ou digite um novo se selecionou "Outro...")','error');if(!secao)return toast('Informe a seção (ou digite uma nova se selecionou "Outro...")','error');var unidade=lerValorOutro('mUnidade')||'un';var estoque=parseFloat(document.getElementById('mEstoque').value)||0;var estoqueMin=parseFloat(document.getElementById('mEstoqueMin').value)||0;var obs=(document.getElementById('mObs')?document.getElementById('mObs').value:'').trim();var d={nome:n,tipo:tipo,secao:secao,localizacao:document.getElementById('mLoc').value.trim(),estoqueAtual:estoque,unidadeMedida:unidade,estoqueMinimo:estoqueMin,observacoes:obs};if(S.editItem){var dbPayload=_stampUpdate(itemToDB(d));var ok=await saveRecord('items',S.editItem.id,dbPayload);if(ok){Object.assign(S.editItem,d,{atualizadoEm:dbPayload.atualizado_em,atualizadoPor:dbPayload.atualizado_por});addHistDB('Item editado: '+n);toast('OK!')}else{toast('Falha ao salvar','error')}}else{var dbNew=_stampInsert(itemToDB(d));var inserted=await insertRecord('items',dbNew);if(inserted){d.id=inserted.id;d.criadoEm=inserted.criado_em||new Date().toISOString();d.criadoPor=inserted.criado_por||_user();S.items.push(d);addHistDB('+ Item: '+n);toast('OK!')}else{toast('Falha ao criar item','error')}}closeModal()};
+window.saveItem=async function(){var n=document.getElementById('mNome').value.trim();var err=validateText(n,2,300,'Nome do item');if(err)return toast(err,'error');var tipo=lerValorOutro('mTipo');var secao=lerValorOutro('mSecao');if(!tipo)return toast('Informe o tipo (ou digite um novo se selecionou "Outro...")','error');if(!secao)return toast('Informe a seção (ou digite uma nova se selecionou "Outro...")','error');var unidade=lerValorOutro('mUnidade')||'un';var estoque=parseFloat(document.getElementById('mEstoque').value)||0;var estoqueMin=parseFloat(document.getElementById('mEstoqueMin').value)||0;var obs=(document.getElementById('mObs')?document.getElementById('mObs').value:'').trim();var d={nome:n,tipo:tipo,secao:secao,localizacao:document.getElementById('mLoc').value.trim(),estoqueAtual:estoque,unidadeMedida:unidade,estoqueMinimo:estoqueMin,observacoes:obs};if(S.editItem){var antesItem={nome:S.editItem.nome,tipo:S.editItem.tipo,secao:S.editItem.secao,localizacao:S.editItem.localizacao,estoqueAtual:S.editItem.estoqueAtual,unidadeMedida:S.editItem.unidadeMedida,estoqueMinimo:S.editItem.estoqueMinimo,observacoes:S.editItem.observacoes};var dbPayload=_stampUpdate(itemToDB(d));var ok=await saveRecord('items',S.editItem.id,dbPayload);if(ok){Object.assign(S.editItem,d,{atualizadoEm:dbPayload.atualizado_em,atualizadoPor:dbPayload.atualizado_por});var dif=diffRegistros(antesItem,d,{nome:'Nome',tipo:'Tipo',secao:'Seção',localizacao:'Localização',estoqueAtual:'Estoque',unidadeMedida:'Unidade',estoqueMinimo:'Estoque mín.',observacoes:'Observações'});addHistDB('Item editado: '+n+(dif?' — '+dif:''));toast('OK!')}else{toast('Falha ao salvar','error')}}else{var dbNew=_stampInsert(itemToDB(d));var inserted=await insertRecord('items',dbNew);if(inserted){d.id=inserted.id;d.criadoEm=inserted.criado_em||new Date().toISOString();d.criadoPor=inserted.criado_por||_user();S.items.push(d);addHistDB('+ Item: '+n);toast('OK!')}else{toast('Falha ao criar item','error')}}closeModal()};
 
 window.openAddPessoa=function(){S.editItem=null;S.modal='addPessoa';render()};
 window.openEditPessoa=function(id){S.editItem=id;S.modal='editPessoa';render()};
@@ -4024,7 +4239,7 @@ if(err)return toast(err,'error');
 var isE=S.modal==='editPessoa';
 var fotoI=document.getElementById('pFoto');
 var addr={nomeMae:document.getElementById('pMae').value.trim(),logradouro:document.getElementById('pLog').value.trim(),numero:document.getElementById('pNum').value.trim(),complemento:document.getElementById('pComp2').value.trim(),bairro:document.getElementById('pBairro').value.trim(),cidade:document.getElementById('pCidade').value.trim(),estado:document.getElementById('pEstado').value.trim(),cep:document.getElementById('pCep').value.trim(),pais:document.getElementById('pPais').value.trim()||'Brasil'};
-async function fin(foto){if(isE){var p=getPessoa(S.editItem);if(p){p.nome=n;p.telefone=tel;p.nomeMae=addr.nomeMae;p.email=document.getElementById('pEmail').value.trim();p.dataNascimento=document.getElementById('pNasc').value;p.origem=document.getElementById('pOrigem').value;p.observacoes=document.getElementById('pObs').value.trim();p.logradouro=addr.logradouro;p.numero=addr.numero;p.complemento=addr.complemento;p.bairro=addr.bairro;p.cidade=addr.cidade;p.estado=addr.estado;p.cep=addr.cep;p.pais=addr.pais;if(foto)p.foto=foto;await saveRecord('pessoas',p.id,pessoaToDB(p));addHistDB('Edit: '+n)}}else{if(tel&&findByPhone(tel))return toast('Tel existe!','error');var np={id:nid(S.pessoas),nome:n,telefone:tel,nomeMae:addr.nomeMae,email:document.getElementById('pEmail').value.trim(),dataNascimento:document.getElementById('pNasc').value,origem:document.getElementById('pOrigem').value,observacoes:document.getElementById('pObs').value.trim(),dataCriacao:today(),foto:foto||'',logradouro:addr.logradouro,numero:addr.numero,complemento:addr.complemento,bairro:addr.bairro,cidade:addr.cidade,estado:addr.estado,cep:addr.cep,pais:addr.pais,tags:[],anexos:[],terceiros:[]};var dbp=await insertRecord('pessoas',pessoaToDB(np));if(dbp)np.id=dbp.id;S.pessoas.push(np);addHistDB('+ '+n)}toast('OK!');closeModal();render()}
+async function fin(foto){if(isE){var p=getPessoa(S.editItem);if(p){var antesP={nome:p.nome,telefone:p.telefone,nomeMae:p.nomeMae,email:p.email,dataNascimento:p.dataNascimento,origem:p.origem,observacoes:p.observacoes,logradouro:p.logradouro,numero:p.numero,complemento:p.complemento,bairro:p.bairro,cidade:p.cidade,estado:p.estado,cep:p.cep,pais:p.pais};p.nome=n;p.telefone=tel;p.nomeMae=addr.nomeMae;p.email=document.getElementById('pEmail').value.trim();p.dataNascimento=document.getElementById('pNasc').value;p.origem=document.getElementById('pOrigem').value;p.observacoes=document.getElementById('pObs').value.trim();p.logradouro=addr.logradouro;p.numero=addr.numero;p.complemento=addr.complemento;p.bairro=addr.bairro;p.cidade=addr.cidade;p.estado=addr.estado;p.cep=addr.cep;p.pais=addr.pais;if(foto)p.foto=foto;await saveRecord('pessoas',p.id,pessoaToDB(p));var depoisP={nome:p.nome,telefone:p.telefone,nomeMae:p.nomeMae,email:p.email,dataNascimento:p.dataNascimento,origem:p.origem,observacoes:p.observacoes,logradouro:p.logradouro,numero:p.numero,complemento:p.complemento,bairro:p.bairro,cidade:p.cidade,estado:p.estado,cep:p.cep,pais:p.pais};var difP=diffRegistros(antesP,depoisP,{nome:'Nome',telefone:'Telefone',nomeMae:'Mãe',email:'Email',dataNascimento:'Nasc.',origem:'Origem',observacoes:'Obs.',logradouro:'Logradouro',numero:'Número',complemento:'Compl.',bairro:'Bairro',cidade:'Cidade',estado:'Estado',cep:'CEP',pais:'País'});addHistDB('Edit: '+n+(difP?' — '+difP:''))}}else{if(tel&&findByPhone(tel))return toast('Tel existe!','error');var np={id:nid(S.pessoas),nome:n,telefone:tel,nomeMae:addr.nomeMae,email:document.getElementById('pEmail').value.trim(),dataNascimento:document.getElementById('pNasc').value,origem:document.getElementById('pOrigem').value,observacoes:document.getElementById('pObs').value.trim(),dataCriacao:today(),foto:foto||'',logradouro:addr.logradouro,numero:addr.numero,complemento:addr.complemento,bairro:addr.bairro,cidade:addr.cidade,estado:addr.estado,cep:addr.cep,pais:addr.pais,tags:[],anexos:[],terceiros:[]};var dbp=await insertRecord('pessoas',pessoaToDB(np));if(dbp)np.id=dbp.id;S.pessoas.push(np);addHistDB('+ '+n)}toast('OK!');closeModal();render()}
 if(fotoI&&fotoI.files&&fotoI.files[0]){compressImage(fotoI.files[0],400,50,function(r){fin(r)})}else fin('')};
 window.goPerfil=function(id){S.viewPessoaId=id;S.activeTab='perfil_cliente';render()};
 window.goCiclo=function(id){S.viewCicloId=id;S.activeTab='detalhe_ciclo';render()};
@@ -4595,11 +4810,14 @@ if(!tipo)return toast('Informe o tipo (ou digite um novo se selecionou "Outro...
 if(!secao)return toast('Informe a seção (ou digite uma nova se selecionou "Outro...")','error');
 var d={nome:n,tipo:tipo,genero:genero,autor:document.getElementById('lvAutor').value.trim(),secao:secao,localizacao:document.getElementById('lvLoc').value.trim(),observacoes:document.getElementById('lvObs').value.trim()};
 if(S.modal==='editLivro'){
+var antesL=S.livros.find(function(l){return l.id===S.editItem});
+var antesLClone=antesL?JSON.parse(JSON.stringify(antesL)):null;
 _stampUpdate(d);
 var h=await getAuthHeaders('return=representation');
 var r=await fetch(SUPABASE_URL+'/rest/v1/livros?id=eq.'+S.editItem,{method:'PATCH',headers:h,body:JSON.stringify(d)});
 if(r.ok){var up=await r.json();if(up.length){var idx=S.livros.findIndex(function(l){return l.id===S.editItem});if(idx>=0)S.livros[idx]=up[0]}}
-addHistDB('Livro editado: '+n)}else{
+var difL=antesLClone?diffRegistros(antesLClone,d,{nome:'Nome',tipo:'Tipo',genero:'Gênero',autor:'Autor',secao:'Seção',localizacao:'Localização',observacoes:'Observações'}):'';
+addHistDB('Livro editado: '+n+(difL?' — '+difL:''))}else{
 _stampInsert(d);
 var h=await getAuthHeaders('return=representation');
 var r=await fetch(SUPABASE_URL+'/rest/v1/livros',{method:'POST',headers:h,body:JSON.stringify(d)});
